@@ -1,0 +1,706 @@
+
+"use client";
+
+import { useState, useEffect, useMemo, useRef } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import type { Account, Transaction } from "@/lib/data";
+import { PlusCircle, Landmark, PiggyBank, CreditCard, Wallet, Star, GripVertical, Pencil, Coins, Trash2 } from "lucide-react";
+import { auth, db } from "@/lib/firebase";
+import { collection, addDoc, query, where, onSnapshot, writeBatch, doc, orderBy, updateDoc, deleteDoc, getDocs, setDoc } from "firebase/firestore";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { restrictToWindowEdges } from '@dnd-kit/modifiers';
+import { useToast } from "@/hooks/use-toast";
+import { useAuthState } from "@/hooks/use-auth-state";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+  }).format(amount);
+};
+
+// Map icon names to components
+const iconComponents: { [key: string]: React.ComponentType<{ className?: string }> } = {
+  Landmark: Landmark,
+  PiggyBank: PiggyBank,
+  CreditCard: CreditCard,
+  Wallet: Wallet,
+};
+
+const getRandomIcon = () => {
+  const icons = Object.keys(iconComponents);
+  const iconName = icons[Math.floor(Math.random() * icons.length)] as keyof typeof iconComponents;
+  return { name: iconName, component: iconComponents[iconName] };
+}
+
+function SortableAccountCard({ account, onSetPrimary, onEdit, onDelete }: { account: Account, onSetPrimary: (id: string) => void, onEdit: (account: Account) => void, onDelete: (accountId: string) => void }) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+    } = useSortable({ id: account.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    };
+    
+    const IconComponent = account.type === 'card' ? CreditCard : (iconComponents[account.icon] || Landmark);
+
+
+    return (
+        <div ref={setNodeRef} style={style} className="relative">
+            <Card className="flex flex-col justify-between h-full group">
+                <div>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-xl font-bold">
+                            {account.name}
+                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                            {account.isPrimary && <Badge variant="secondary" className="border-primary text-primary">Primary</Badge>}
+                            <IconComponent className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold">
+                            {formatCurrency(account.balance)}
+                        </div>
+                         {account.type === 'card' ? (
+                            account.limit != null && account.limit > 0 ? (
+                                <p className="text-xs text-muted-foreground">
+                                    Due of {formatCurrency(account.limit)} limit
+                                </p>
+                            ) : (
+                                <p className="text-xs text-muted-foreground">Amount Due</p>
+                            )
+                        ) : (
+                            <p className="text-xs text-muted-foreground">Current Balance</p>
+                        )}
+                        <p className="text-sm text-muted-foreground mt-2">{account.purpose}</p>
+                    </CardContent>
+                </div>
+                <CardFooter className="flex items-center justify-between pt-4">
+                    <div className="flex gap-2">
+                        {!account.isPrimary && (
+                            <Button variant="outline" size="sm" onClick={(e) => {e.stopPropagation(); onSetPrimary(account.id)}}>
+                                <Star className="mr-2 h-4 w-4" />
+                                Set as Primary
+                            </Button>
+                        )}
+                         <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); onEdit(account)}}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                        </Button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm">
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This will permanently delete the "{account.name}" account. All transactions associated with this account will be re-assigned to your primary account. This action cannot be undone.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => onDelete(account.id)} className="bg-destructive hover:bg-destructive/90">
+                                        Delete
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+
+                    </div>
+                    <div {...attributes} {...listeners} className="touch-none p-2 cursor-grab ml-auto text-muted-foreground hover:text-foreground">
+                        <GripVertical className="h-5 w-5" />
+                    </div>
+                </CardFooter>
+            </Card>
+        </div>
+    );
+}
+
+export function AccountList() {
+  const [rawAccounts, setRawAccounts] = useState<Omit<Account, 'balance'>[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  
+  const [addAccountType, setAddAccountType] = useState<'bank' | 'card'>('bank');
+  const [editAccountType, setEditAccountType] = useState<'bank' | 'card'>('bank');
+
+  const [user, loading] = useAuthState();
+  const sensors = useSensors(useSensor(PointerSensor));
+  const { toast } = useToast();
+
+   useEffect(() => {
+    if (selectedAccount) {
+      setEditAccountType(selectedAccount.type || 'bank');
+    }
+  }, [selectedAccount]);
+
+
+  useEffect(() => {
+    if (user && db) {
+      const q = query(collection(db, "accounts"), where("userId", "==", user.uid), orderBy("order", "asc"));
+      const unsubscribeAccounts = onSnapshot(q, (querySnapshot) => {
+        const userAccounts: Omit<Account, 'balance'>[] = [];
+        querySnapshot.forEach((doc) => {
+          const { balance, ...data } = doc.data();
+          userAccounts.push({ id: doc.id, ...data } as Omit<Account, 'balance'>);
+        });
+        setRawAccounts(userAccounts);
+      }, (error) => {
+      });
+      
+      const transactionsQuery = query(collection(db, "transactions"), where("userId", "==", user.uid));
+      const unsubscribeTransactions = onSnapshot(transactionsQuery, (snapshot) => {
+          setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
+      });
+
+      return () => {
+          unsubscribeAccounts();
+          unsubscribeTransactions();
+      }
+    }
+  }, [user, db]);
+
+  const { cashWalletBalance, digitalWalletBalance } = useMemo(() => {
+    let cash = 0;
+    let digital = 0;
+    transactions.forEach((t) => {
+      if (t.type === 'transfer') {
+        if (t.toAccountId === 'cash-wallet') cash += t.amount;
+        if (t.fromAccountId === 'cash-wallet') cash -= t.amount;
+        if (t.toAccountId === 'digital-wallet') digital += t.amount;
+        if (t.fromAccountId === 'digital-wallet') digital -= t.amount;
+      } else if (t.type === 'expense') {
+        if (t.paymentMethod === 'cash') cash -= t.amount;
+        if (t.paymentMethod === 'digital') digital -= t.amount;
+      }
+    });
+    return { cashWalletBalance: cash, digitalWalletBalance: digital };
+  }, [transactions]);
+
+
+  const accounts = useMemo(() => {
+    const balances: { [key: string]: number } = {};
+    rawAccounts.forEach(acc => {
+        balances[acc.id] = 0; // Start with 0
+    });
+    
+    const accountMap = new Map(rawAccounts.map(acc => [acc.id, acc]));
+
+    transactions.forEach(t => {
+        if (t.type === 'income' && t.accountId && balances[t.accountId] !== undefined) {
+            const account = accountMap.get(t.accountId);
+            // Income only affects bank accounts
+            if(account?.type !== 'card') {
+                balances[t.accountId] += t.amount;
+            }
+        } else if (t.type === 'expense' && t.accountId && t.paymentMethod === 'online' && balances[t.accountId] !== undefined) {
+            const account = accountMap.get(t.accountId);
+            if (account?.type === 'card') {
+                balances[t.accountId] += t.amount; // For cards, expenses increase balance (debt)
+            } else {
+                balances[t.accountId] -= t.amount;
+            }
+        } else if (t.type === 'transfer') {
+            if (t.fromAccountId && balances[t.fromAccountId] !== undefined) {
+                const fromAccount = accountMap.get(t.fromAccountId);
+                if (fromAccount?.type === 'card') {
+                    balances[t.fromAccountId] += t.amount; // Cash advance increases debt
+                } else {
+                    balances[t.fromAccountId] -= t.amount;
+                }
+            }
+            if (t.toAccountId && balances[t.toAccountId] !== undefined) {
+                const toAccount = accountMap.get(t.toAccountId);
+                if (toAccount?.type === 'card') {
+                    balances[t.toAccountId] -= t.amount; // Payment to card decreases debt
+                } else {
+                    balances[t.toAccountId] += t.amount;
+                }
+            }
+        }
+    });
+
+    return rawAccounts.map(acc => ({
+        ...acc,
+        balance: balances[acc.id] ?? 0,
+    }));
+  }, [rawAccounts, transactions]);
+  
+  const accountIds = useMemo(() => accounts.map(a => a.id), [accounts]);
+
+
+  const handleAddAccount = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!user) return;
+
+    const formData = new FormData(event.currentTarget);
+    const type = formData.get("type") as 'bank' | 'card';
+    const { name: iconName } = getRandomIcon();
+    
+    const isFirstAccount = accounts.length === 0;
+
+    const newAccount: any = {
+      userId: user.uid,
+      name: formData.get("name") as string,
+      purpose: formData.get("purpose") as string,
+      type: type,
+      icon: type === 'card' ? 'CreditCard' : iconName,
+      isPrimary: isFirstAccount,
+      order: accounts.length,
+      actualBalance: parseFloat(formData.get("balance") as string) || 0,
+    };
+
+    if (type === 'card') {
+        const limit = parseFloat(formData.get("limit") as string);
+        if (!isNaN(limit)) {
+            newAccount.limit = limit;
+        }
+    }
+
+    try {
+      await addDoc(collection(db, "accounts"), newAccount);
+      setIsAddDialogOpen(false);
+      setAddAccountType('bank');
+    } catch (error) {
+    }
+  };
+
+  const handleEditAccount = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!user || !selectedAccount) return;
+
+    const formData = new FormData(event.currentTarget);
+    const updatedData: Partial<Account> = {
+      name: formData.get("name") as string,
+      purpose: formData.get("purpose") as string,
+      type: formData.get("type") as 'bank' | 'card',
+    };
+
+    if (updatedData.type === 'card') {
+        const limitVal = formData.get("limit") as string;
+        if (limitVal) {
+            const limit = parseFloat(limitVal);
+            if (!isNaN(limit)) {
+                updatedData.limit = limit;
+            } else {
+                updatedData.limit = null;
+            }
+        } else {
+            updatedData.limit = null;
+        }
+    } else {
+        // Explicitly remove the limit field if it's not a card
+        updatedData.limit = null;
+    }
+
+
+    try {
+      const accountRef = doc(db, "accounts", selectedAccount.id);
+      await updateDoc(accountRef, {
+        ...updatedData
+      });
+      setIsEditDialogOpen(false);
+      setSelectedAccount(null);
+    } catch (error) {
+    }
+  };
+
+  const handleDeleteAccount = async (accountId: string) => {
+    if (!user) return;
+    const accountToDelete = accounts.find(acc => acc.id === accountId);
+    if (!accountToDelete) return;
+    if (accountToDelete.isPrimary) {
+      toast({
+        variant: "destructive",
+        title: "Deletion Failed",
+        description: "You cannot delete your primary account. Please set another account as primary first.",
+      });
+      return;
+    }
+
+    const primaryAccount = accounts.find(acc => acc.isPrimary);
+    if (!primaryAccount) {
+         toast({
+            variant: "destructive",
+            title: "Deletion Failed",
+            description: "No primary account found to re-assign transactions to.",
+        });
+        return;
+    }
+
+    try {
+      // Start a batch write
+      const batch = writeBatch(db);
+
+      // Query for all transactions associated with the account to be deleted
+      const transactionsQuery = query(collection(db, "transactions"), where("userId", "==", user.uid));
+      const transactionsSnapshot = await getDocs(transactionsQuery);
+
+      let updatedCount = 0;
+      transactionsSnapshot.forEach(transactionDoc => {
+        const transaction = { id: transactionDoc.id, ...transactionDoc.data() } as Transaction;
+        let needsUpdate = false;
+        const updateData: Partial<Transaction> = {};
+        
+        // Re-assign accountId for income/expenses
+        if (transaction.accountId === accountId) {
+          updateData.accountId = primaryAccount.id;
+          needsUpdate = true;
+        }
+        // Re-assign fromAccountId for transfers
+        if (transaction.fromAccountId === accountId) {
+          updateData.fromAccountId = primaryAccount.id;
+           needsUpdate = true;
+        }
+        // Re-assign toAccountId for transfers
+        if (transaction.toAccountId === accountId) {
+          updateData.toAccountId = primaryAccount.id;
+           needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+          batch.update(transactionDoc.ref, updateData);
+          updatedCount++;
+        }
+      });
+      
+      // Delete the account
+      const accountRef = doc(db, "accounts", accountId);
+      batch.delete(accountRef);
+
+      // Commit the batch
+      await batch.commit();
+
+      toast({
+        title: "Account Deleted",
+        description: `Successfully deleted the account and re-assigned ${updatedCount} transaction(s).`,
+      });
+    } catch (error: any) {
+       toast({
+        variant: "destructive",
+        title: "Deletion Failed",
+        description: error.message || "An error occurred while deleting the account.",
+      });
+    }
+  };
+
+
+  const handleSetPrimary = async (accountId: string) => {
+    if (!user) return;
+    const batch = writeBatch(db);
+    
+    const currentPrimary = accounts.find(acc => acc.isPrimary);
+    if (currentPrimary && currentPrimary.id !== accountId) {
+        const currentPrimaryRef = doc(db, "accounts", currentPrimary.id);
+        batch.update(currentPrimaryRef, { isPrimary: false });
+    }
+
+    const newPrimaryRef = doc(db, "accounts", accountId);
+    batch.update(newPrimaryRef, { isPrimary: true });
+
+    try {
+        await batch.commit();
+    } catch (error) {
+    }
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+        const oldIndex = accountIds.indexOf(active.id as string);
+        const newIndex = accountIds.indexOf(over!.id as string);
+        const reorderedItems = arrayMove(accounts, oldIndex, newIndex);
+        setRawAccounts(reorderedItems.map(({ balance, ...rest }) => rest));
+
+
+        const batch = writeBatch(db);
+        reorderedItems.forEach((item, index) => {
+          const docRef = doc(db, "accounts", item.id);
+          batch.update(docRef, { order: index });
+        });
+        batch.commit().catch(err => {});
+    }
+  }
+
+  const openEditDialog = (account: Account) => {
+    setSelectedAccount(account);
+    setIsEditDialogOpen(true);
+  }
+
+  if (loading) {
+    return (
+        <Card>
+            <CardHeader>
+                <Skeleton className="h-8 w-1/2" />
+                <Skeleton className="h-4 w-3/4" />
+            </CardHeader>
+            <CardContent className="grid gap-6 sm:grid-cols-1 md:grid-cols-2">
+                <Skeleton className="h-48 w-full" />
+                <Skeleton className="h-48 w-full" />
+                <Skeleton className="h-48 w-full" />
+            </CardContent>
+        </Card>
+    )
+  }
+
+  return (
+    <>
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle>Your Financial Accounts</CardTitle>
+          <CardDescription>
+            Manage your bank accounts and view your wallets.
+          </CardDescription>
+        </div>
+        <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+            setIsAddDialogOpen(open);
+            if (!open) {
+                setAddAccountType('bank');
+            }
+        }}>
+          <DialogTrigger asChild>
+            <Button>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add Account
+            </Button>
+          </DialogTrigger>
+          <DialogContent onInteractOutside={(e) => e.preventDefault()} className="sm:max-w-[425px]">
+            <form onSubmit={handleAddAccount}>
+              <DialogHeader>
+                <DialogTitle>Add New Account</DialogTitle>
+                <DialogDescription>
+                  Enter the details for your new account.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="type" className="text-right">
+                    Type
+                  </Label>
+                   <Select name="type" value={addAccountType} onValueChange={(value: 'bank' | 'card') => setAddAccountType(value)}>
+                      <SelectTrigger id="type" className="col-span-3">
+                          <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="bank">Bank Account</SelectItem>
+                          <SelectItem value="card">Credit Card</SelectItem>
+                      </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="name" className="text-right">
+                    Name
+                  </Label>
+                  <Input id="name" name="name" placeholder="e.g. HDFC Credit Card" className="col-span-3" required />
+                </div>
+                 <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="purpose" className="text-right">
+                    Purpose
+                  </Label>
+                  <Input id="purpose" name="purpose" placeholder="e.g. For online shopping" className="col-span-3" required />
+                </div>
+                 {addAccountType === 'card' && (
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="limit" className="text-right">Credit Limit</Label>
+                        <Input id="limit" name="limit" type="number" placeholder="e.g. 100000" className="col-span-3" />
+                    </div>
+                )}
+                 <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="balance" className="text-right">
+                    {addAccountType === 'card' ? 'Current Due' : 'Actual Balance'}
+                  </Label>
+                  <Input id="balance" name="balance" type="number" placeholder={addAccountType === 'card' ? "e.g. 5000" : "e.g. 50000"} className="col-span-3" />
+                </div>
+              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                    <Button type="button" variant="secondary">Cancel</Button>
+                </DialogClose>
+                <Button type="submit">Add Account</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2">
+            <Card className="flex flex-col justify-between h-full group">
+                <div>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-xl font-bold">
+                            Cash Wallet
+                        </CardTitle>
+                        <Coins className="h-6 w-6 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold">
+                            {formatCurrency(cashWalletBalance)}
+                        </div>
+                        <p className="text-sm text-muted-foreground">For cash in hand</p>
+                    </CardContent>
+                </div>
+                <CardFooter>
+                    <Badge variant="outline">Built-in</Badge>
+                </CardFooter>
+            </Card>
+
+            <Card className="flex flex-col justify-between h-full group">
+                <div>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-xl font-bold">
+                            Digital Wallet
+                        </CardTitle>
+                        <Wallet className="h-6 w-6 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold">
+                            {formatCurrency(digitalWalletBalance)}
+                        </div>
+                        <p className="text-sm text-muted-foreground">For e-wallet payments</p>
+                    </CardContent>
+                </div>
+                <CardFooter>
+                    <Badge variant="outline">Built-in</Badge>
+                </CardFooter>
+            </Card>
+
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+              modifiers={[restrictToWindowEdges]}
+            >
+              <SortableContext items={accountIds} strategy={rectSortingStrategy}>
+                  {accounts.map((account) => (
+                    <SortableAccountCard key={account.id} account={account} onSetPrimary={handleSetPrimary} onEdit={openEditDialog} onDelete={handleDeleteAccount} />
+                  ))}
+              </SortableContext>
+            </DndContext>
+        </div>
+        {accounts.length === 0 && (
+          <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-40">
+            <Landmark className="h-10 w-10 mb-2"/>
+            <p>No bank accounts yet. Click "Add Account" to get started.</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+
+    {/* Edit Account Dialog */}
+    <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent onInteractOutside={(e) => e.preventDefault()} className="sm:max-w-[425px]">
+            <form onSubmit={handleEditAccount}>
+            <DialogHeader>
+                <DialogTitle>Edit Account</DialogTitle>
+                <DialogDescription>
+                Update the details for your account.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="edit-type" className="text-right">
+                        Type
+                    </Label>
+                     <Select name="type" value={editAccountType} onValueChange={(value: 'bank' | 'card') => setEditAccountType(value)}>
+                        <SelectTrigger id="edit-type" className="col-span-3">
+                            <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="bank">Bank Account</SelectItem>
+                            <SelectItem value="card">Credit Card</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="edit-name" className="text-right">
+                        Name
+                    </Label>
+                    <Input id="edit-name" name="name" defaultValue={selectedAccount?.name} className="col-span-3" required />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="edit-purpose" className="text-right">
+                        Purpose
+                    </Label>
+                    <Input id="edit-purpose" name="purpose" defaultValue={selectedAccount?.purpose} className="col-span-3" required />
+                </div>
+                 {editAccountType === 'card' && (
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="edit-limit" className="text-right">Credit Limit</Label>
+                        <Input id="edit-limit" name="limit" type="number" defaultValue={selectedAccount?.limit ?? ''} className="col-span-3" />
+                    </div>
+                )}
+            </div>
+            <DialogFooter>
+                <DialogClose asChild>
+                    <Button type="button" variant="secondary" onClick={() => setSelectedAccount(null)}>Cancel</Button>
+                </DialogClose>
+                <Button type="submit">Save Changes</Button>
+            </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
+    </>
+  );
+}

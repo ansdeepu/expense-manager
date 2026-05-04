@@ -1,0 +1,294 @@
+
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableFooter,
+} from "@/components/ui/table";
+import { auth, db } from "@/lib/firebase";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import type { Transaction, Category, Account } from "@/lib/data";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { CalendarIcon } from "lucide-react";
+import { DayProps, Day as DefaultDay } from "react-day-picker";
+
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Bar, BarChart, XAxis, YAxis } from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import { cn } from "@/lib/utils";
+import { format, startOfDay, getYear, getMonth, isSameDay } from "date-fns";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAuthState } from "@/hooks/use-auth-state";
+
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+  }).format(amount);
+};
+
+export function OverviewChart() {
+  const [user] = useAuthState();
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+
+  useEffect(() => {
+    setSelectedDate(new Date());
+  }, []);
+
+
+  useEffect(() => {
+    if (user && db) {
+      const transactionsQuery = query(
+        collection(db, "transactions"),
+        where("userId", "==", user.uid),
+        where("type", "==", "expense")
+      );
+      const unsubscribeTransactions = onSnapshot(
+        transactionsQuery,
+        (snapshot) => {
+          setTransactions(
+            snapshot.docs.map(
+              (doc) => ({ id: doc.id, ...doc.data() } as Transaction)
+            )
+          );
+        }
+      );
+      
+      const categoriesQuery = query(
+        collection(db, "categories"),
+        where("userId", "==", user.uid)
+      );
+      const unsubscribeCategories = onSnapshot(
+        categoriesQuery,
+        (snapshot) => {
+          setCategories(
+            snapshot.docs.map(
+              (doc) => ({ id: doc.id, ...doc.data() } as Category)
+            )
+          );
+        }
+      );
+
+      const accountsQuery = query(
+        collection(db, "accounts"),
+        where("userId", "==", user.uid)
+      );
+      const unsubscribeAccounts = onSnapshot(accountsQuery, (snapshot) => {
+        setAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
+      });
+
+      return () => {
+        unsubscribeTransactions();
+        unsubscribeCategories();
+        unsubscribeAccounts();
+      };
+    }
+  }, [user, db]);
+  
+  const primaryAccountId = useMemo(() => {
+    const primaryAccount = accounts.find(acc => acc.isPrimary);
+    return primaryAccount?.id;
+  }, [accounts]);
+
+  const dailyExpenses = useMemo(() => {
+    // Include expenses from primary account, cash, and digital wallets
+    const relevantExpenses = transactions.filter(t => 
+        t.type === 'expense'
+    );
+
+    return relevantExpenses.reduce((acc, t) => {
+      const date = format(startOfDay(new Date(t.date)), "yyyy-MM-dd");
+      if (!acc[date]) {
+        acc[date] = 0;
+      }
+      acc[date] += t.amount;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [transactions]);
+
+  const transactionsOnSelectedDate = useMemo(() => {
+    if (!selectedDate) return [];
+    return transactions.filter(t => 
+        t.type === 'expense' &&
+        isSameDay(new Date(t.date), selectedDate)
+    );
+  }, [transactions, selectedDate]);
+
+  const totalForSelectedDate = useMemo(() => {
+    return transactionsOnSelectedDate.reduce((total, t) => total + t.amount, 0);
+  }, [transactionsOnSelectedDate]);
+
+
+  const monthlyChartData = useMemo(() => {
+    const currentYear = getYear(new Date());
+    const monthlyTotals = Array.from({ length: 12 }, (_, i) => ({ month: format(new Date(currentYear, i), 'MMM'), total: 0 }));
+
+    const expenseTransactions = transactions.filter(t => 
+        t.type === 'expense'
+    );
+
+    expenseTransactions.forEach(t => {
+      const transactionDate = new Date(t.date);
+      if (getYear(transactionDate) === currentYear) {
+        const monthIndex = getMonth(transactionDate);
+        monthlyTotals[monthIndex].total += t.amount;
+      }
+    });
+
+    return monthlyTotals;
+  }, [transactions]);
+
+  const DayWithTooltip = (props: DayProps) => {
+    const { day } = props;
+    if (!(day instanceof Date)) {
+      return <DefaultDay {...props} />;
+    }
+  
+    const dateString = format(day, "yyyy-MM-dd");
+    const expenseTotal = dailyExpenses[dateString];
+  
+    if (!expenseTotal) {
+      return <DefaultDay {...props} />;
+    }
+  
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DefaultDay {...props} />
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{formatCurrency(expenseTotal)}</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  };
+
+  return (
+    <Card className="lg:col-span-4">
+      <CardHeader>
+        <CardTitle>Daily & Monthly Expense Overview</CardTitle>
+        <CardDescription>
+          Select a day to see detailed expenses for that date.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col items-center gap-6">
+        <Popover open={isPickerOpen} onOpenChange={setIsPickerOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                variant={"outline"}
+                className={cn(
+                    "w-[280px] justify-start text-left font-normal",
+                    !selectedDate && "text-muted-foreground"
+                )}
+                >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {selectedDate ? format(selectedDate, "dd/MM/yyyy") : <span>Pick a date</span>}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+                <TooltipProvider>
+                    <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => {
+                            setSelectedDate(date);
+                            setIsPickerOpen(false);
+                        }}
+                        modifiers={{
+                        withExpenses: (date) => {
+                            const dateString = format(startOfDay(date), "yyyy-MM-dd");
+                            return !!dailyExpenses[dateString];
+                        },
+                        }}
+                        modifiersClassNames={{
+                        withExpenses: "bg-accent/30 rounded-full",
+                        }}
+                        components={{
+                          Day: DayWithTooltip,
+                        }}
+                        initialFocus
+                    />
+                </TooltipProvider>
+            </PopoverContent>
+        </Popover>
+
+        {transactionsOnSelectedDate.length > 0 && (
+           <div className="w-full">
+                <h3 className="text-md font-medium mb-2 text-center">
+                    Expenses for {format(selectedDate!, "MMMM dd, yyyy")}
+                </h3>
+                <ScrollArea className="h-40 w-full">
+                     <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Description</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {transactionsOnSelectedDate.map(t => (
+                                <TableRow key={t.id}>
+                                    <TableCell>{t.description}</TableCell>
+                                    <TableCell className="text-right font-mono">{formatCurrency(t.amount)}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                         <TableFooter>
+                            <TableRow>
+                                <TableCell className="font-bold">Total</TableCell>
+                                <TableCell className="text-right font-bold font-mono">{formatCurrency(totalForSelectedDate)}</TableCell>
+                            </TableRow>
+                        </TableFooter>
+                    </Table>
+                </ScrollArea>
+           </div>
+        )}
+
+        <div className="w-full">
+            <h3 className="text-md font-medium mb-4 text-center">
+                Monthly Expenses for {getYear(new Date())}
+            </h3>
+            <ChartContainer config={{}} className="h-[200px] w-full">
+                <BarChart accessibilityLayer data={monthlyChartData}>
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
+                    <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => `${value/1000}k`} />
+                    <ChartTooltip 
+                      cursor={false}
+                      content={<ChartTooltipContent formatter={(value) => formatCurrency(value as number)} />}
+                    />
+                    <Bar dataKey="total" fill="var(--color-chart-1)" radius={4} />
+                </BarChart>
+            </ChartContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

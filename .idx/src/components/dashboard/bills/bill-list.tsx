@@ -1,0 +1,756 @@
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PlusCircle, Pencil, Trash2, CalendarIcon as Calendar, FileText, Repeat, Gift, AlertCircle } from "lucide-react";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, query, where, onSnapshot, doc, deleteDoc, updateDoc, orderBy } from "firebase/firestore";
+import { 
+    format, 
+    differenceInDays, 
+    isPast, 
+    addMonths, 
+    addQuarters, 
+    addYears, 
+    setDate as setDayOfMonth, 
+    getDate, 
+    parseISO, 
+    isBefore, 
+    isValid, 
+    getYear, 
+    setYear, 
+    isAfter, 
+    startOfMonth,
+    startOfToday
+} from "date-fns";
+import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { Bill, Category, Transaction } from "@/lib/data";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { useAuthState } from "@/hooks/use-auth-state";
+import { Textarea } from "@/components/ui/textarea";
+
+const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+    }).format(amount);
+};
+
+const getDayWithOrdinal = (d: number) => {
+  if (d > 3 && d < 21) return `${d}th`;
+  switch (d % 10) {
+    case 1:  return `${d}st`;
+    case 2:  return `${d}nd`;
+    case 3:  return `${d}rd`;
+    default: return `${d}th`;
+  }
+};
+
+const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function MonthSelector({ selectedMonths, onMonthToggle }: { selectedMonths: string[], onMonthToggle: (month: string) => void }) {
+    return (
+        <div className="space-y-2">
+            <Label>Select Months</Label>
+            <div className="grid grid-cols-4 gap-2">
+                {months.map(month => (
+                    <Button
+                        key={month}
+                        type="button"
+                        variant={selectedMonths.includes(month) ? "default" : "outline"}
+                        onClick={() => onMonthToggle(month)}
+                        className="h-8 text-xs"
+                    >
+                        {month}
+                    </Button>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+const getNextPaymentDate = (bill: Bill) => {
+    if (bill.type === 'special_day') return null;
+
+    let dueDate = parseISO(bill.dueDate);
+    const today = startOfToday();
+
+    if (!isValid(dueDate)) return null;
+
+    if (bill.recurrence === 'occasional' || bill.recurrence === 'none') {
+        return isBefore(dueDate, today) ? null : dueDate;
+    }
+
+    let nextDate = dueDate;
+    while (isBefore(nextDate, today)) {
+         switch (bill.recurrence) {
+            case 'monthly':
+                nextDate = addMonths(nextDate, 1);
+                break;
+            case 'quarterly':
+                nextDate = addQuarters(nextDate, 1);
+                break;
+            case 'yearly':
+                nextDate = addYears(nextDate, 1);
+                break;
+            default:
+                return nextDate; 
+        }
+    }
+    return nextDate;
+};
+
+const getCelebrationDate = (specialDay: Bill) => {
+    const originalDate = parseISO(specialDay.dueDate);
+    if (!isValid(originalDate)) return null;
+
+    const today = startOfToday();
+    const currentYear = getYear(today);
+    
+    let celebrationDate = setYear(originalDate, currentYear);
+    if (isBefore(celebrationDate, today)) {
+      celebrationDate = addYears(celebrationDate, 1);
+    }
+    
+    return celebrationDate;
+};
+
+const formatDueDate = (bill: Bill) => {
+    const dueDate = parseISO(bill.dueDate);
+    
+    if (!isValid(dueDate)) return "Invalid Date";
+
+    if (bill.type === 'special_day') {
+        return format(dueDate, 'dd/MM/yyyy');
+    }
+
+    const day = getDayWithOrdinal(getDate(dueDate));
+
+    switch (bill.recurrence) {
+        case 'monthly':
+            return `${day} of every month`;
+        case 'quarterly': {
+            if (bill.selectedMonths && bill.selectedMonths.length > 0) {
+                return `${day} of ${bill.selectedMonths.join(', ')}`;
+            }
+            const firstMonth = format(dueDate, 'MMM');
+            const secondMonth = format(addMonths(dueDate, 3), 'MMM');
+            const thirdMonth = format(addMonths(dueDate, 6), 'MMM');
+            const fourthMonth = format(addMonths(dueDate, 9), 'MMM');
+            return `${day} of ${firstMonth}, ${secondMonth}, ${thirdMonth}, ${fourthMonth}`;
+        }
+        case 'yearly':
+             if (bill.selectedMonths && bill.selectedMonths.length > 0) {
+                return `${day} of ${bill.selectedMonths.join(', ')}`;
+            }
+            return `${day} of ${format(dueDate, 'MMM')}`;
+        case 'occasional': {
+            if (bill.selectedMonths && bill.selectedMonths.length > 0) {
+                return `${day} of ${bill.selectedMonths.join(', ')}`;
+            }
+            return `${day} of ${format(dueDate, 'MMM')} (Occasional)`;
+        }
+        default:
+            return format(dueDate, 'dd/MM/yyyy');
+    }
+};
+
+export function BillList({ eventType }: { eventType: 'bill' | 'special_day' }) {
+    const [allEvents, setAllEvents] = useState<Bill[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
+    const [user, loading] = useAuthState();
+    const [clientLoaded, setClientLoaded] = useState(false);
+    
+    const [addEventType, setAddEventType] = useState<Bill['type']>(eventType);
+    const [addDay, setAddDay] = useState<number>(getDate(new Date()));
+    const [addDate, setAddDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+    const [addRecurrence, setAddRecurrence] = useState<Bill['recurrence']>('occasional');
+    const [addSelectedMonths, setAddSelectedMonths] = useState<string[]>([]);
+    const [addCategoryId, setAddCategoryId] = useState<string>('');
+    const [addSubcategory, setAddSubcategory] = useState<string>('');
+    const [addRemarks, setAddRemarks] = useState('');
+
+    const [editDay, setEditDay] = useState<number | undefined>();
+    const [editDate, setEditDate] = useState<string>('');
+    const [editEventType, setEditEventType] = useState<Bill['type']>('bill');
+    const [editRecurrence, setEditRecurrence] = useState<Bill['recurrence']>('occasional');
+    const [editSelectedMonths, setEditSelectedMonths] = useState<string[]>([]);
+    const [editCategoryId, setEditCategoryId] = useState<string>('');
+    const [editSubcategory, setEditSubcategory] = useState<string>('');
+    const [editRemarks, setEditRemarks] = useState('');
+
+    useEffect(() => {
+        setAddEventType(eventType);
+    }, [eventType]);
+
+    useEffect(() => {
+        setClientLoaded(true);
+    }, []);
+
+    useEffect(() => {
+        if (user && db) {
+            const billsQuery = query(collection(db, "bills"), where("userId", "==", user.uid));
+            const unsubscribeBills = onSnapshot(billsQuery, (querySnapshot) => {
+                const userBills: Bill[] = [];
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    userBills.push({ id: doc.id, ...data } as Bill);
+                });
+                setAllEvents(userBills);
+            });
+
+            const categoriesQuery = query(collection(db, "categories"), where("userId", "==", user.uid), orderBy("order", "asc"));
+            const unsubscribeCategories = onSnapshot(categoriesQuery, (snapshot) => {
+                setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category)));
+            });
+
+            const transactionsQuery = query(collection(db, "transactions"), where("userId", "==", user.uid));
+            const unsubscribeTransactions = onSnapshot(transactionsQuery, (snapshot) => {
+                setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
+            });
+            
+            return () => {
+                unsubscribeBills();
+                unsubscribeCategories();
+                unsubscribeTransactions();
+            }
+        }
+    }, [user]);
+
+    const sortedBills = useMemo(() => {
+        const filtered = allEvents.filter(event => event.type === eventType);
+        return [...filtered].sort((a, b) => {
+            const dateA = a.type === 'bill' ? getNextPaymentDate(a) : getCelebrationDate(a);
+            const dateB = b.type === 'bill' ? getNextPaymentDate(b) : getCelebrationDate(b);
+            
+            if (!dateA && !dateB) return 0;
+            if (!dateA) return 1;
+            if (!dateB) return -1;
+            
+            return dateA.getTime() - dateB.getTime();
+        });
+    }, [allEvents, eventType]);
+
+    const expenseCategories = useMemo(() => {
+        return categories
+            .filter(c => c.type === 'expense' || c.type === 'bank-expense')
+            .sort((a, b) => {
+                const aName = a.name.toLowerCase();
+                const bName = b.name.toLowerCase();
+                const aIsSpecial = aName.includes('fed bank') || aName.includes('hdfc bank') || aName.includes('post bank') || aName.includes('money box');
+                const bIsSpecial = bName.includes('fed bank') || bName.includes('hdfc bank') || bName.includes('post bank') || bName.includes('money box');
+                if (aIsSpecial && !bIsSpecial) return 1;
+                if (!aIsSpecial && bIsSpecial) return -1;
+                return (a.order ?? 0) - (b.order ?? 0);
+            });
+    }, [categories]);
+
+    const addSubcategories = useMemo(() => {
+        if (!addCategoryId) return [];
+        return categories.find(c => c.id === addCategoryId)?.subcategories || [];
+    }, [addCategoryId, categories]);
+
+    const editSubcategories = useMemo(() => {
+        if (!editCategoryId) return [];
+        return categories.find(c => c.id === editCategoryId)?.subcategories || [];
+    }, [editCategoryId, categories]);
+
+    useEffect(() => {
+        if (selectedBill) {
+            setEditEventType(selectedBill.type || 'bill');
+            setEditRecurrence(selectedBill.recurrence || 'occasional');
+            setEditSelectedMonths(selectedBill.selectedMonths || []);
+            setEditCategoryId(selectedBill.categoryId || '');
+            setEditSubcategory(selectedBill.subcategory || '');
+            setEditRemarks(selectedBill.remarks || '');
+            const dueDate = parseISO(selectedBill.dueDate);
+            if (isValid(dueDate)) {
+                setEditDay(getDate(dueDate));
+                setEditDate(format(dueDate, 'yyyy-MM-dd'));
+            } else {
+                setEditDay(undefined);
+                setEditDate('');
+            }
+        }
+    }, [selectedBill]);
+
+    const handleMonthToggle = (month: string, setMonths: React.Dispatch<React.SetStateAction<string[]>>) => {
+        setMonths(prev => 
+            prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month]
+        );
+    };
+
+    const handleAddBill = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (!user) return;
+        const formData = new FormData(event.currentTarget);
+        const title = formData.get("title") as string;
+        let determinedDueDate: Date;
+        if (addEventType === 'special_day') {
+             const dateValue = formData.get("special-date") as string;
+             determinedDueDate = new Date(dateValue);
+             determinedDueDate = new Date(determinedDueDate.getTime() + determinedDueDate.getTimezoneOffset() * 60000);
+        } else {
+            determinedDueDate = setDayOfMonth(startOfToday(), addDay);
+        }
+        const categoryDoc = categories.find(c => c.id === addCategoryId);
+        const newBill: Partial<Bill> & { userId: string } = {
+            userId: user.uid,
+            title: addEventType === 'special_day' ? title : (categoryDoc?.name && addSubcategory ? `${categoryDoc.name} / ${addSubcategory}` : title),
+            dueDate: determinedDueDate.toISOString(),
+            type: addEventType,
+            amount: 0,
+            recurrence: 'occasional',
+            remarks: addRemarks,
+        };
+        if (addEventType === 'bill') {
+            newBill.amount = parseFloat(formData.get("amount") as string);
+            newBill.recurrence = addRecurrence;
+            newBill.selectedMonths = addSelectedMonths;
+            newBill.categoryId = addCategoryId;
+            newBill.category = categoryDoc?.name || '';
+            newBill.subcategory = addSubcategory;
+            newBill.title = `${newBill.category} / ${newBill.subcategory}`;
+        }
+        try {
+            await addDoc(collection(db, "bills"), newBill);
+            setIsAddDialogOpen(false);
+            setAddCategoryId(''); setAddSubcategory(''); setAddSelectedMonths([]); setAddRemarks('');
+        } catch (error) {}
+    };
+
+    const handleEditBill = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (!user || !selectedBill) return;
+        const formData = new FormData(event.currentTarget);
+        const title = formData.get("title") as string;
+        let determinedDueDate: Date;
+        if (editEventType === 'special_day') {
+             const dateValue = formData.get("special-date") as string;
+             determinedDueDate = new Date(dateValue);
+             determinedDueDate = new Date(determinedDueDate.getTime() + determinedDueDate.getTimezoneOffset() * 60000);
+        } else {
+            determinedDueDate = setDayOfMonth(new Date(selectedBill.dueDate), editDay || 1);
+        }
+        const categoryDoc = categories.find(c => c.id === editCategoryId);
+        const updatedData: Partial<Bill> = {
+            title: editEventType === 'special_day' ? title : (categoryDoc?.name && editSubcategory ? `${categoryDoc.name} / ${editSubcategory}` : title),
+            dueDate: determinedDueDate.toISOString(),
+            type: editEventType,
+            remarks: editRemarks,
+        };
+        if (editEventType === 'bill') {
+            updatedData.amount = parseFloat(formData.get("amount") as string);
+            updatedData.recurrence = editRecurrence;
+            updatedData.selectedMonths = editSelectedMonths;
+            updatedData.categoryId = editCategoryId;
+            updatedData.category = categoryDoc?.name || '';
+            updatedData.subcategory = editSubcategory;
+            updatedData.title = `${updatedData.category} / ${updatedData.subcategory}`;
+        }
+        try {
+            await updateDoc(doc(db, "bills", selectedBill.id), updatedData);
+            setIsEditDialogOpen(false);
+            setSelectedBill(null);
+        } catch (error) {}
+    };
+
+    const handleDeleteBill = async (billId: string) => {
+        if (!user) return;
+        try { await deleteDoc(doc(db, "bills", billId)); } catch (error) {}
+    };
+
+    const openEditDialog = (bill: Bill) => {
+        setSelectedBill(bill);
+        setIsEditDialogOpen(true);
+    };
+
+    const getLastPaymentDate = (bill: Bill) => {
+        if (bill.type !== 'bill') return null;
+        const matchingTransactions = transactions.filter(t => {
+            if (t.type !== 'expense') return false;
+            const matchesTopLevel = (t.categoryId === bill.categoryId || t.category === bill.category) && t.subcategory === bill.subcategory;
+            if (matchesTopLevel) return true;
+            if (t.items && t.items.length > 0) {
+                return t.items.some(item => (item.categoryId === bill.categoryId || item.category === bill.category) && item.subcategory === bill.subcategory);
+            }
+            return false;
+        }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        if (matchingTransactions.length > 0) {
+            return parseISO(matchingTransactions[0].date);
+        }
+        return bill.paidOn ? parseISO(bill.paidOn) : null;
+    };
+
+    const getMissingPayments = (bill: Bill, transactions: Transaction[]) => {
+        if (bill.type !== 'bill') return null;
+        if (bill.recurrence !== 'monthly') return null;
+        const today = new Date();
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth();
+        const missing: string[] = [];
+        for (let m = 0; m <= currentMonth; m++) {
+            const hasPayment = transactions.some(t => {
+                if (t.type !== 'expense') return false;
+                const d = new Date(t.date);
+                if (d.getFullYear() !== currentYear || d.getMonth() !== m) return false;
+                const matchesCat = t.categoryId === bill.categoryId || t.category === bill.category;
+                const matchesSub = t.subcategory === bill.subcategory;
+                if (matchesCat && matchesSub) return true;
+                if (t.items && t.items.length > 0) {
+                    return t.items.some(i => (i.categoryId === bill.categoryId || i.category === bill.category) && i.subcategory === bill.subcategory);
+                }
+                return false;
+            });
+            if (!hasPayment) missing.push(months[m]);
+        }
+        return missing.length > 0 ? `Unpaid in ${currentYear}: ${missing.join(', ')}` : null;
+    };
+
+    if (loading || !clientLoaded) {
+        return <Skeleton className="h-96 w-full" />
+    }
+
+    const title = eventType === 'bill' ? 'Bills' : 'Special Days';
+    const description = eventType === 'bill' ? 'Keep track of your upcoming payments based on category and subcategory.' : 'Keep track of your special days.';
+
+    return (
+        <>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                        <CardTitle>Manage Your {title}</CardTitle>
+                        <CardDescription>{description}</CardDescription>
+                    </div>
+                    <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button><PlusCircle className="mr-2 h-4 w-4" /> Add Event</Button>
+                        </DialogTrigger>
+                        <DialogContent onInteractOutside={(e) => e.preventDefault()} className="sm:max-w-xl">
+                            <form onSubmit={handleAddBill}>
+                                <DialogHeader>
+                                    <DialogTitle>Add New Event</DialogTitle>
+                                    <DialogDescription>Enter the details for your new bill or special day.</DialogDescription>
+                                </DialogHeader>
+                                <div className="grid gap-4 py-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="type">Event Type</Label>
+                                        <Select name="type" value={addEventType} onValueChange={(v) => setAddEventType(v as Bill['type'])}>
+                                            <SelectTrigger id="type"><SelectValue placeholder="Select type" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="bill">Bill</SelectItem>
+                                                <SelectItem value="special_day">Special Day</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {addEventType === 'bill' ? (
+                                      <>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label>Category</Label>
+                                                <Select value={addCategoryId} onValueChange={setAddCategoryId} required>
+                                                    <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                                                    <SelectContent>{expenseCategories.map(cat => (<SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>))}</SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Sub-category</Label>
+                                                <Select value={addSubcategory} onValueChange={setAddSubcategory} disabled={!addCategoryId} required>
+                                                    <SelectTrigger><SelectValue placeholder="Select sub-category" /></SelectTrigger>
+                                                    <SelectContent>{addSubcategories.map(sub => (<SelectItem key={sub.id} value={sub.name}>{sub.name}</SelectItem>))}</SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="amount">Amount</Label>
+                                                <Input id="amount" name="amount" type="number" step="0.01" placeholder="0.00" required className="hide-number-arrows" />
+                                            </div>
+                                             <div className="space-y-2">
+                                                <Label htmlFor="recurrence">Recurrence</Label>
+                                                <Select name="recurrence" value={addRecurrence} onValueChange={(v) => setAddRecurrence(v as Bill['recurrence'])}>
+                                                    <SelectTrigger id="recurrence"><SelectValue placeholder="Select recurrence" /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="occasional">Occasional</SelectItem>
+                                                        <SelectItem value="yearly">Yearly</SelectItem>
+                                                        <SelectItem value="quarterly">Quarterly</SelectItem>
+                                                        <SelectItem value="monthly">Monthly</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="day">Due Day of Month</Label>
+                                            <Input id="day" name="day" type="number" min="1" max="31" value={addDay} onChange={(e) => setAddDay(parseInt(e.target.value, 10))} placeholder="e.g. 26" required />
+                                        </div>
+                                        <MonthSelector selectedMonths={addSelectedMonths} onMonthToggle={(m) => handleMonthToggle(m, setAddSelectedMonths)} />
+                                        <div className="space-y-2">
+                                            <Label htmlFor="add-remarks">Remarks (Manual Note)</Label>
+                                            <Textarea id="add-remarks" value={addRemarks} onChange={(e) => setAddRemarks(e.target.value)} placeholder="e.g. Payment details..." />
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="title">Title</Label>
+                                            <Input id="title" name="title" placeholder="e.g. Birthday" required />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="special-date">Special Date</Label>
+                                            <Input id="special-date" name="special-date" type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)} className="w-full" required />
+                                        </div>
+                                      </>
+                                    )}
+                                </div>
+                                <DialogFooter>
+                                    <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
+                                    <Button type="submit">Add Event</Button>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Sl. No.</TableHead>
+                                <TableHead>{eventType === 'bill' ? 'Category / Sub-category' : 'Title'}</TableHead>
+                                {eventType === 'bill' ? (
+                                    <>
+                                        <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead>Due Date</TableHead>
+                                        <TableHead>Last Payment Date</TableHead>
+                                        <TableHead>Next Due Date</TableHead>
+                                        <TableHead>Remarks</TableHead>
+                                    </>
+                                ) : (
+                                    <>
+                                        <TableHead>Special Date</TableHead>
+                                        <TableHead>Celebration Date</TableHead>
+                                    </>
+                                )}
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {sortedBills.map((bill, index) => {
+                                const nextPaymentDate = getNextPaymentDate(bill);
+                                const lastPaymentDate = getLastPaymentDate(bill);
+                                const isPaidThisMonth = lastPaymentDate && isAfter(lastPaymentDate, startOfMonth(new Date()));
+                                
+                                let isOverdue = false;
+                                let daysUntilDue = 0;
+                                if (bill.type === 'bill') {
+                                    if (bill.recurrence === 'monthly') {
+                                        const currentCycleDate = setDayOfMonth(startOfToday(), getDate(parseISO(bill.dueDate)));
+                                        isOverdue = isPast(currentCycleDate) && !isPaidThisMonth;
+                                        daysUntilDue = differenceInDays(nextPaymentDate || currentCycleDate, startOfToday());
+                                    } else {
+                                        const dueDate = parseISO(bill.dueDate);
+                                        isOverdue = isPast(dueDate) && !isPaidThisMonth;
+                                        daysUntilDue = isValid(dueDate) ? differenceInDays(dueDate, startOfToday()) : 0;
+                                    }
+                                }
+
+                                const celebrationDate = bill.type === 'special_day' ? getCelebrationDate(bill) : null;
+                                const missingPayments = getMissingPayments(bill, transactions);
+                                return (
+                                <TableRow key={bill.id} className={cn(bill.type === 'bill' && isPaidThisMonth && "text-muted-foreground")}>
+                                    <TableCell>{index + 1}</TableCell>
+                                    <TableCell className="font-medium">
+                                        <div className="flex items-center gap-2">
+                                            {bill.type === 'special_day' ? <Gift className="h-4 w-4 text-amber-500" /> : <FileText className="h-4 w-4" />}
+                                            <span>{bill.title}</span>
+                                             {bill.type === 'bill' && bill.recurrence !== 'occasional' && (
+                                                <Badge variant="outline" className="capitalize flex items-center gap-1">
+                                                   <Repeat className="h-3 w-3" /> {bill.recurrence}
+                                                </Badge>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                    {eventType === 'bill' ? (
+                                        <>
+                                            <TableCell className="text-right font-mono">{formatCurrency(bill.amount)}</TableCell>
+                                            <TableCell>
+                                                <div>{formatDueDate(bill)}</div>
+                                                <div className={cn("text-xs", isOverdue ? "text-red-500" : "text-muted-foreground")}>
+                                                    {isPaidThisMonth 
+                                                        ? `Paid on ${format(lastPaymentDate!, 'MMMM')}` 
+                                                        : isOverdue 
+                                                            ? "Overdue" 
+                                                            : `Due in ${daysUntilDue} days`
+                                                    }
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>{lastPaymentDate ? format(lastPaymentDate, 'dd/MM/yyyy') : '-'}</TableCell>
+                                            <TableCell>{nextPaymentDate ? format(nextPaymentDate, 'dd/MM/yyyy') : '-'}</TableCell>
+                                            <TableCell className="max-w-[200px]">
+                                                <div className="flex flex-col gap-1">
+                                                    {bill.remarks && <p className="text-sm font-medium">{bill.remarks}</p>}
+                                                    {missingPayments && (
+                                                        <div className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 dark:bg-red-950/20 px-2 py-1 rounded-md">
+                                                            <AlertCircle className="h-3.5 w-3.5" />
+                                                            <span>{missingPayments}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <TableCell>{isValid(parseISO(bill.dueDate)) ? format(parseISO(bill.dueDate), 'dd/MM/yyyy') : 'Invalid Date'}</TableCell>
+                                            <TableCell>{celebrationDate ? format(celebrationDate, 'dd/MM/yyyy') : '-'}</TableCell>
+                                        </>
+                                    )}
+                                    <TableCell className="text-right">
+                                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(bill)} className="mr-2"><Pencil className="h-4 w-4" /></Button>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete this event.</AlertDialogDescription></AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDeleteBill(bill.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </TableCell>
+                                </TableRow>
+                            )})}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogContent onInteractOutside={(e) => e.preventDefault()} className="sm:max-w-xl">
+                    <form onSubmit={handleEditBill}>
+                        <DialogHeader>
+                            <DialogTitle>Edit Event</DialogTitle>
+                            <DialogDescription>Update the details for your event.</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                             <div className="space-y-2">
+                                <Label htmlFor="edit-type">Event Type</Label>
+                                <Select name="type" value={editEventType} onValueChange={(v) => setEditEventType(v as Bill['type'])}>
+                                    <SelectTrigger id="edit-type"><SelectValue placeholder="Select type" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="bill">Bill</SelectItem>
+                                        <SelectItem value="special_day">Special Day</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            {editEventType === 'bill' ? (
+                                <>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Category</Label>
+                                            <Select value={editCategoryId} onValueChange={setEditCategoryId} required>
+                                                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                                                <SelectContent>{expenseCategories.map(cat => (<SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>))}</SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Sub-category</Label>
+                                            <Select value={editSubcategory} onValueChange={setEditSubcategory} disabled={!editCategoryId} required>
+                                                <SelectTrigger><SelectValue placeholder="Select sub-category" /></SelectTrigger>
+                                                <SelectContent>{editSubcategories.map(sub => (<SelectItem key={sub.id} value={sub.name}>{sub.name}</SelectItem>))}</SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit-amount">Amount</Label>
+                                            <Input id="edit-amount" name="amount" type="number" step="0.01" defaultValue={selectedBill?.amount} required className="hide-number-arrows" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit-recurrence">Recurrence</Label>
+                                            <Select name="recurrence" value={editRecurrence} onValueChange={(v) => setEditRecurrence(v as Bill['recurrence'])}>
+                                                <SelectTrigger id="edit-recurrence"><SelectValue placeholder="Select recurrence" /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="occasional">Occasional</SelectItem>
+                                                    <SelectItem value="yearly">Yearly</SelectItem>
+                                                    <SelectItem value="quarterly">Quarterly</SelectItem>
+                                                    <SelectItem value="monthly">Monthly</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="edit-day">Due Day of Month</Label>
+                                        <Input id="edit-day" name="edit-day" type="number" min="1" max="31" value={editDay ?? ''} onChange={(e) => setEditDay(e.target.value === '' ? undefined : parseInt(e.target.value, 10))} required />
+                                    </div>
+                                    <MonthSelector selectedMonths={editSelectedMonths} onMonthToggle={(m) => handleMonthToggle(m, setEditSelectedMonths)} />
+                                    <div className="space-y-2">
+                                        <Label htmlFor="edit-remarks">Remarks (Manual Note)</Label>
+                                        <Textarea id="edit-remarks" value={editRemarks} onChange={(e) => setEditRemarks(e.target.value)} placeholder="e.g. Note about previous payments..." />
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="edit-title">Title</Label>
+                                        <Input id="edit-title" name="title" defaultValue={selectedBill?.title} required />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="special-date">Special Date</Label>
+                                        <Input id="special-date" name="special-date" type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="w-full" required />
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                        <DialogFooter>
+                            <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
+                            <Button type="submit">Save Changes</Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+        </>
+    );
+}
