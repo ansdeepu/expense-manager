@@ -20,9 +20,9 @@ export const metadata: Metadata = {
   description: "Manage your expenses with ease and get AI-powered insights.",
   manifest: "/manifest.json",
   icons: {
-    icon: "/icon-192.png",
-    shortcut: "/icon-192.png",
-    apple: "/icon-192.png",
+    icon: "https://picsum.photos/192/192",
+    shortcut: "https://picsum.photos/192/192",
+    apple: "https://picsum.photos/192/192",
   },
   appleWebApp: {
     capable: true,

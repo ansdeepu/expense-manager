@@ -1,9 +1,9 @@
-const CACHE_NAME = 'budget-cache-v23';
+const CACHE_NAME = 'budget-cache-v24';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
-  '/icon-192.png',
-  '/icon-512.png'
+  'https://picsum.photos/192/192',
+  'https://picsum.photos/512/512'
 ];
 
 self.addEventListener('install', (event) => {
