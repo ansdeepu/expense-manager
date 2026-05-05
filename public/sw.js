@@ -1,7 +1,9 @@
-const CACHE_NAME = 'budget-cache-v14';
+const CACHE_NAME = 'budget-cache-v15';
 const ASSETS_TO_CACHE = [
   '/',
-  '/manifest-v2.json',
+  '/manifest.json',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
   '/app-icon.png'
 ];
 

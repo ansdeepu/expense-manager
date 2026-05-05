@@ -18,7 +18,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "FinBudgetManager",
   description: "Manage your expenses with ease and get AI-powered insights.",
-  manifest: "/manifest-v2.json",
+  manifest: "/manifest.json",
   themeColor: "#000000",
   icons: {
     icon: "/app-icon.png",
