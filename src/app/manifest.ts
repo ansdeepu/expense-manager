@@ -5,10 +5,14 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'FinBudgetManager',
     short_name: 'Budget',
     description: 'Comprehensive personal finance and budget management application.',
+    id: '/',
     start_url: '/',
+    scope: '/',
     display: 'standalone',
     background_color: '#ffffff',
     theme_color: '#000000',
+    orientation: 'portrait',
+    prefer_related_applications: false,
     icons: [
       {
         src: '/app-icon.png',
