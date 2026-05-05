@@ -10,10 +10,18 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "FinBudgetManager",
   description: "Manage your expenses with ease and get AI-powered insights.",
+  manifest: "/manifest.ts",
   icons: {
-    icon: "/app-icon.png",
+    icon: [
+      { url: "/app-icon.png" },
+      { url: "/app-icon.png", sizes: "16x16", type: "image/png" },
+      { url: "/app-icon.png", sizes: "32x32", type: "image/png" },
+      { url: "/app-icon.png", sizes: "192x192", type: "image/png" },
+    ],
     shortcut: "/app-icon.png",
-    apple: "/app-icon.png",
+    apple: [
+      { url: "/app-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
   appleWebApp: {
     capable: true,
