@@ -1,21 +1,43 @@
-/* Simple PWA Service Worker */
-const CACHE_NAME = 'budget-v12';
+const CACHE_NAME = 'budget-cache-v14';
+const ASSETS_TO_CACHE = [
+  '/',
+  '/manifest-v2.json',
+  '/app-icon.png'
+];
 
 self.addEventListener('install', (event) => {
-  console.log('PWA: Service Worker installing');
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(ASSETS_TO_CACHE);
+    })
+  );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('PWA: Service Worker activating');
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
+      );
+    })
+  );
+  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  // Respond with something for fetch to satisfy Chrome
+  if (event.request.method !== 'GET') return;
+
   event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request);
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+      return fetch(event.request);
     })
   );
 });
