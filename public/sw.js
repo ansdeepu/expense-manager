@@ -1,9 +1,8 @@
-const CACHE_NAME = 'budget-cache-v20';
+const CACHE_NAME = 'budget-cache-v21';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
-  '/icon-192.png',
-  '/icon-512.png'
+  '/app-icon.png'
 ];
 
 self.addEventListener('install', (event) => {
