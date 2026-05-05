@@ -13,6 +13,7 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#000000',
     orientation: 'portrait',
     prefer_related_applications: false,
+    categories: ['finance', 'productivity'],
     icons: [
       {
         src: '/app-icon.png',

@@ -18,7 +18,6 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "FinBudgetManager",
   description: "Manage your expenses with ease and get AI-powered insights.",
-  manifest: "/manifest.json",
   icons: {
     icon: [
       { url: "/app-icon.png" },
@@ -50,9 +49,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.className} h-screen`}>
-      <head>
-        <meta name="theme-color" content="#000000" />
-      </head>
       <body className="antialiased h-screen">
         <ClientProviders>
           <ServiceWorkerRegistration />
