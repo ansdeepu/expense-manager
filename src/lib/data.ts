@@ -31,6 +31,7 @@ export type Bill = {
   amount: number;
   dueDate: string;
   paidOn?: string;
+  manualPayments?: string[];
   type: 'bill' | 'special_day';
   recurrence: 'none' | 'monthly' | 'quarterly' | 'yearly' | 'occasional';
   selectedMonths?: string[];

@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Pencil, Trash2, CalendarIcon as Calendar, FileText, Repeat, Gift, AlertCircle } from "lucide-react";
+import { PlusCircle, Pencil, Trash2, CalendarIcon as Calendar, FileText, Repeat, Gift, AlertCircle, Check } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, query, where, onSnapshot, doc, deleteDoc, updateDoc, orderBy } from "firebase/firestore";
 import { 
@@ -420,36 +420,115 @@ export function BillList({ eventType }: { eventType: 'bill' | 'special_day' }) {
             }
             return false;
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
         if (matchingTransactions.length > 0) {
             return parseISO(matchingTransactions[0].date);
         }
+
         return bill.paidOn ? parseISO(bill.paidOn) : null;
     };
 
     const getMissingPayments = (bill: Bill, transactions: Transaction[]) => {
-        if (bill.type !== 'bill') return null;
-        if (bill.recurrence !== 'monthly') return null;
+        if (bill.type !== 'bill') return [];
+        
         const today = new Date();
         const currentYear = today.getFullYear();
         const currentMonth = today.getMonth();
-        const missing: string[] = [];
+        const currentDay = today.getDate();
+        
+        const dueDateObj = parseISO(bill.dueDate);
+        const billDueDay = isValid(dueDateObj) ? getDate(dueDateObj) : 1;
+        const billDueMonth = isValid(dueDateObj) ? dueDateObj.getMonth() : -1;
+
+        const results: { month: string, year: number, monthIndex: number }[] = [];
+        
+        // Loop through all months of the current year up to current month
         for (let m = 0; m <= currentMonth; m++) {
+            const billYear = isValid(dueDateObj) ? getYear(dueDateObj) : currentYear;
+            
+            // Only check months in the current year if the bill started this year or earlier
+            if (billYear > currentYear) continue;
+
+            // Determine if the bill is due in this month 'm'
+            let isDueThisMonth = false;
+            
+            if (bill.recurrence === 'monthly') {
+                isDueThisMonth = true;
+            } else if (bill.selectedMonths && bill.selectedMonths.length > 0) {
+                isDueThisMonth = bill.selectedMonths.includes(months[m]);
+            } else if (bill.recurrence === 'yearly') {
+                isDueThisMonth = billDueMonth === m;
+            } else if (bill.recurrence === 'quarterly') {
+                isDueThisMonth = Math.abs(m - billDueMonth) % 3 === 0;
+            } else if (bill.recurrence === 'occasional' || bill.recurrence === 'none') {
+                isDueThisMonth = billDueMonth === m && billYear === currentYear;
+            }
+
+            if (!isDueThisMonth) continue;
+
+            const isCurrentMonthPending = m === currentMonth && currentDay <= billDueDay;
+
+            const targetMonthName = months[m].toLowerCase();
+            const targetFullMonthName = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][m].toLowerCase();
+
             const hasPayment = transactions.some(t => {
-                if (t.type !== 'expense') return false;
-                const d = new Date(t.date);
-                if (d.getFullYear() !== currentYear || d.getMonth() !== m) return false;
-                const matchesCat = t.categoryId === bill.categoryId || t.category === bill.category;
-                const matchesSub = t.subcategory === bill.subcategory;
-                if (matchesCat && matchesSub) return true;
-                if (t.items && t.items.length > 0) {
-                    return t.items.some(i => (i.categoryId === bill.categoryId || i.category === bill.category) && i.subcategory === bill.subcategory);
+                if (t.type !== 'expense' && t.type !== 'transfer') return false; 
+                
+                const billCatId = bill.categoryId;
+                const billCatName = bill.category?.toLowerCase().trim();
+                const transCatId = t.categoryId;
+                const transCatName = t.category?.toLowerCase().trim();
+
+                const billSub = bill.subcategory?.toLowerCase().trim();
+                const transSub = t.subcategory?.toLowerCase().trim();
+
+                const matchesCat = (billCatId && transCatId && billCatId === transCatId) || 
+                                 (billCatName && transCatName && billCatName === transCatName);
+                
+                const matchesSub = !billSub || (transSub && transSub.includes(billSub)) || (transSub && billSub === transSub);
+                
+                let isCategoryMatch = matchesCat && matchesSub;
+                
+                if (!isCategoryMatch && t.items && t.items.length > 0) {
+                    isCategoryMatch = t.items.some(i => {
+                        const itemCatId = i.categoryId;
+                        const itemCatName = i.category?.toLowerCase().trim();
+                        const itemSub = i.subcategory?.toLowerCase().trim();
+                        
+                        const itemMatchesCat = (billCatId && itemCatId && billCatId === itemCatId) || 
+                                             (billCatName && itemCatName && billCatName === itemCatName);
+                        const itemMatchesSub = !billSub || (itemSub && itemSub.includes(billSub)) || (itemSub && billSub === itemSub);
+                        
+                        return itemMatchesCat && itemMatchesSub;
+                    });
                 }
+
+                if (!isCategoryMatch) return false;
+
+                const d = new Date(t.date);
+                const isSameYear = d.getFullYear() === currentYear;
+                
+                if (isSameYear && d.getMonth() === m) return true;
+
+                if (isSameYear) {
+                    const desc = (t.description || "").toLowerCase();
+                    if (desc.includes(targetMonthName) || desc.includes(targetFullMonthName)) return true;
+
+                    if (t.items && t.items.length > 0) {
+                        if (t.items.some(i => (i.description || "").toLowerCase().includes(targetMonthName) || (i.description || "").toLowerCase().includes(targetFullMonthName))) return true;
+                    }
+                }
+                
                 return false;
             });
-            if (!hasPayment) missing.push(months[m]);
+            
+            if (!hasPayment && !isCurrentMonthPending) {
+                results.push({ month: months[m], year: currentYear, monthIndex: m });
+            }
         }
-        return missing.length > 0 ? `Unpaid in ${currentYear}: ${missing.join(', ')}` : null;
+        return results;
     };
+
 
     if (loading || !clientLoaded) {
         return <Skeleton className="h-96 w-full" />
@@ -629,14 +708,22 @@ export function BillList({ eventType }: { eventType: 'bill' | 'special_day' }) {
                                             </TableCell>
                                             <TableCell>{lastPaymentDate ? format(lastPaymentDate, 'dd/MM/yyyy') : '-'}</TableCell>
                                             <TableCell>{nextPaymentDate ? format(nextPaymentDate, 'dd/MM/yyyy') : '-'}</TableCell>
-                                            <TableCell className="max-w-[200px]">
-                                                <div className="flex flex-col gap-1">
-                                                    {bill.remarks && <p className="text-sm font-medium">{bill.remarks}</p>}
-                                                    {missingPayments && (
-                                                        <div className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 dark:bg-red-950/20 px-2 py-1 rounded-md">
-                                                            <AlertCircle className="h-3.5 w-3.5" />
-                                                            <span>{missingPayments}</span>
+                                            <TableCell className="max-w-[300px]">
+                                                <div className="flex flex-col gap-2">
+                                                    {missingPayments.length > 0 ? (
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            {missingPayments.map((p, idx) => (
+                                                                <div 
+                                                                    key={idx} 
+                                                                    className="flex items-center gap-1.5 text-[10px] font-bold text-red-700 bg-red-100 dark:bg-red-950/40 px-2 py-1 rounded-full border border-red-200 dark:border-red-900/50"
+                                                                >
+                                                                    <AlertCircle className="h-2.5 w-2.5 shrink-0" />
+                                                                    <span>{p.month}</span>
+                                                                </div>
+                                                            ))}
                                                         </div>
+                                                    ) : (
+                                                        bill.remarks && <p className="text-sm text-muted-foreground">{bill.remarks}</p>
                                                     )}
                                                 </div>
                                             </TableCell>
@@ -648,17 +735,19 @@ export function BillList({ eventType }: { eventType: 'bill' | 'special_day' }) {
                                         </>
                                     )}
                                     <TableCell className="text-right">
-                                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(bill)} className="mr-2"><Pencil className="h-4 w-4" /></Button>
-                                        <AlertDialog>
-                                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                                            <AlertDialogContent>
-                                                <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete this event.</AlertDialogDescription></AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={() => handleDeleteBill(bill.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-                                                </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
+                                        <div className="flex justify-end gap-1">
+                                            <Button variant="ghost" size="icon" onClick={() => openEditDialog(bill)}><Pencil className="h-4 w-4" /></Button>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete this event.</AlertDialogDescription></AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleDeleteBill(bill.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             )})}

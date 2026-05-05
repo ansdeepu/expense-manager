@@ -8,9 +8,24 @@ import { ClientProviders } from "@/components/client-providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Expense Manager",
+  title: "FinBudgetManager",
   description: "Manage your expenses with ease and get AI-powered insights.",
+  icons: {
+    icon: "/app-icon.png",
+    apple: "/app-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "FinBudgetManager",
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
+
+import { ServiceWorkerRegistration } from "@/components/pwa-registration";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -18,8 +33,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.className} h-screen`}>
+      <head>
+        <meta name="theme-color" content="#000000" />
+      </head>
       <body className="antialiased h-screen">
         <ClientProviders>
+          <ServiceWorkerRegistration />
           {children}
           <Toaster />
         </ClientProviders>
