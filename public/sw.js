@@ -1,7 +1,7 @@
-const CACHE_NAME = 'fin-budget-v4';
+const CACHE_NAME = 'budget-manager-v6';
 const ASSETS_TO_CACHE = [
   '/',
-  '/manifest.json',
+  '/manifest',
   '/app-icon.png',
 ];
 
@@ -28,33 +28,25 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
+      // Return cached response if found
       if (cachedResponse) {
         return cachedResponse;
       }
 
-      return fetch(event.request)
-        .then((response) => {
-          // Check if we received a valid response
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-
-          // Optionally cache new requests here if needed, but let's keep it simple for now
-          return response;
-        })
-        .catch(() => {
-          // Fallback for navigation requests
-          if (event.request.mode === 'navigate') {
-            return caches.match('/');
-          }
-          // Return a dummy response to avoid console errors
-          return new Response('Network error', { status: 408, statusText: 'Network Error' });
-        });
+      // Otherwise fetch from network
+      return fetch(event.request).then((response) => {
+        return response;
+      }).catch(() => {
+        // Fallback for navigation requests
+        if (event.request.mode === 'navigate') {
+          return caches.match('/');
+        }
+        return new Response('Network error occurred', { status: 408 });
+      });
     })
   );
 });

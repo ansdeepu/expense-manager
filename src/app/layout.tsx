@@ -18,7 +18,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "FinBudgetManager",
   description: "Manage your expenses with ease and get AI-powered insights.",
-  manifest: "/manifest.json",
+  manifest: "/manifest",
   icons: {
     icon: "/app-icon.png",
     shortcut: "/app-icon.png",
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
   other: {
     "mobile-web-app-capable": "yes",
     "apple-mobile-web-app-capable": "yes",
-    "apple-mobile-web-app-status-bar-style": "default",
+    "apple-mobile-web-app-status-bar-style": "black-translucent",
   }
 };
 
