@@ -36,6 +36,8 @@ export const metadata: Metadata = {
     "mobile-web-app-capable": "yes",
     "apple-mobile-web-app-capable": "yes",
     "apple-mobile-web-app-status-bar-style": "black-translucent",
+    "msapplication-TileColor": "#000000",
+    "msapplication-tap-highlight": "no",
   }
 };
 
