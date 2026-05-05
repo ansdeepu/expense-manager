@@ -21,7 +21,9 @@ self.addEventListener('activate', (event) => {
       })
     ))
   );
-  self.claim();
+  if (self.clients && self.clients.claim) {
+    event.waitUntil(self.clients.claim());
+  }
 });
 
 self.addEventListener('fetch', (event) => {
