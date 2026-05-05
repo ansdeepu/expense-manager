@@ -18,18 +18,11 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "FinBudgetManager",
   description: "Manage your expenses with ease and get AI-powered insights.",
-  manifest: "/manifest.json",
+  manifest: "/manifest",
   icons: {
-    icon: [
-      { url: "/app-icon.png" },
-      { url: "/app-icon.png", sizes: "16x16", type: "image/png" },
-      { url: "/app-icon.png", sizes: "32x32", type: "image/png" },
-      { url: "/app-icon.png", sizes: "192x192", type: "image/png" },
-    ],
+    icon: "/app-icon.png",
     shortcut: "/app-icon.png",
-    apple: [
-      { url: "/app-icon.png", sizes: "180x180", type: "image/png" },
-    ],
+    apple: "/app-icon.png",
   },
   appleWebApp: {
     capable: true,
