@@ -12,6 +12,7 @@ export const metadata: Metadata = {
   description: "Manage your expenses with ease and get AI-powered insights.",
   icons: {
     icon: "/app-icon.png",
+    shortcut: "/app-icon.png",
     apple: "/app-icon.png",
   },
   appleWebApp: {
