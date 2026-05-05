@@ -1,15 +1,11 @@
 {
   "name": "FinBudgetManager",
-  "short_name": "FinBudget",
-  "description": "Smart finance and budget tracking application.",
-  "id": "fin-budget-manager-app",
+  "short_name": "Budget",
+  "description": "Smart budget tracking app.",
   "start_url": "/",
-  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#000000",
-  "orientation": "portrait",
-  "categories": ["finance", "productivity"],
   "icons": [
     {
       "src": "/app-icon.png",

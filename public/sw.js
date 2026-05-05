@@ -1,50 +1,18 @@
-const CACHE_NAME = 'budget-v7';
-const OFFLINE_URL = '/';
-
-const ASSETS = [
-  '/',
-  '/manifest.json',
-  '/app-icon.png',
-];
+const CACHE_NAME = 'fin-budget-v9';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
-    })
-  );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
-      );
-    })
-  );
-  self.clients.claim();
+  event.waitUntil(self.clients.claim());
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-
-  event.respondWith(
-    fetch(event.request)
-      .catch(() => {
-        return caches.match(event.request).then((response) => {
-          if (response) {
-            return response;
-          }
-          if (event.request.mode === 'navigate') {
-            return caches.match(OFFLINE_URL);
-          }
-        });
-      })
-  );
+  // Pass through all requests
+  // Chrome requires a fetch event listener to be present for PWA installability
+  event.respondWith(fetch(event.request).catch(() => {
+    // If offline, try to return something from cache if it was there
+    return caches.match(event.request);
+  }));
 });
