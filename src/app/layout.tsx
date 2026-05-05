@@ -18,7 +18,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "FinBudgetManager",
   description: "Manage your expenses with ease and get AI-powered insights.",
-  manifest: "/manifest",
+  manifest: "/manifest.json",
   icons: {
     icon: "/app-icon.png",
     shortcut: "/app-icon.png",
@@ -32,6 +32,11 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "default",
+  }
 };
 
 import { ServiceWorkerRegistration } from "@/components/pwa-registration";
