@@ -1,0 +1,25 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="256" cy="256" r="240" fill="white" />
+  <defs>
+    <filter id="shadow" x="0" y="0" width="512" height="512">
+      <feDropShadow dx="0" dy="4" stdDeviation="10" flood-opacity="0.1" />
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <!-- Main Rupee Symbol Structure -->
+    <!-- Top Horizontal Bar 1 -->
+    <path d="M160 160H352V195H160V160Z" fill="#03A9F4" />
+    <!-- Top Horizontal Bar 2 -->
+    <path d="M160 215H352V250H160V215Z" fill="#009688" />
+    
+    <!-- Curved Middle part -->
+    <path d="M352 215C352 215 352 300 256 300C210 300 180 280 160 250" stroke="#4CAF50" stroke-width="35" fill="none" />
+    
+    <!-- Slanted Leg -->
+    <path d="M220 300L340 450" stroke="#FF9800" stroke-width="40" stroke-linecap="round" />
+    
+    <!-- Geometric Accents to mimic Image 2 style -->
+    <path d="M256 300L180 250V215H256V300Z" fill="#8BC34A" opacity="0.8" />
+    <path d="M352 160L280 250H352V160Z" fill="#2196F3" opacity="0.6" />
+  </g>
+</svg>
