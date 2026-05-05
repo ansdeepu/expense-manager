@@ -1,25 +1,37 @@
-<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="256" cy="256" r="240" fill="white" />
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <filter id="shadow" x="0" y="0" width="512" height="512">
-      <feDropShadow dx="0" dy="4" stdDeviation="10" flood-opacity="0.1" />
-    </filter>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
+    </linearGradient>
   </defs>
-  <g filter="url(#shadow)">
-    <!-- Main Rupee Symbol Structure -->
-    <!-- Top Horizontal Bar 1 -->
-    <path d="M160 160H352V195H160V160Z" fill="#03A9F4" />
-    <!-- Top Horizontal Bar 2 -->
-    <path d="M160 215H352V250H160V215Z" fill="#009688" />
-    
-    <!-- Curved Middle part -->
-    <path d="M352 215C352 215 352 300 256 300C210 300 180 280 160 250" stroke="#4CAF50" stroke-width="35" fill="none" />
-    
-    <!-- Slanted Leg -->
-    <path d="M220 300L340 450" stroke="#FF9800" stroke-width="40" stroke-linecap="round" />
-    
-    <!-- Geometric Accents to mimic Image 2 style -->
-    <path d="M256 300L180 250V215H256V300Z" fill="#8BC34A" opacity="0.8" />
-    <path d="M352 160L280 250H352V160Z" fill="#2196F3" opacity="0.6" />
+
+  <!-- Background -->
+  <rect x="0" y="0" width="512" height="512" rx="100" fill="url(#bg)"/>
+
+  <!-- Wallet -->
+  <rect x="80" y="250" width="260" height="140" rx="20" fill="#ffffff" opacity="0.95"/>
+  <rect x="80" y="290" width="260" height="40" fill="#e5e7eb"/>
+
+  <!-- Credit Card -->
+  <rect x="120" y="270" width="200" height="80" rx="12" fill="url(#accent)"/>
+  <rect x="120" y="300" width="200" height="12" fill="#ffffff" opacity="0.6"/>
+
+  <!-- Rupee Symbol Circle -->
+  <circle cx="180" cy="200" r="70" fill="#ffffff"/>
+  <text x="180" y="225" font-size="80" text-anchor="middle" fill="#1e40af" font-family="Arial, sans-serif">₹</text>
+
+  <!-- Bank -->
+  <g transform="translate(300,130)">
+    <polygon points="0,40 80,0 160,40" fill="#ffffff"/>
+    <rect x="10" y="40" width="140" height="20" fill="#ffffff"/>
+    <rect x="20" y="60" width="20" height="70" fill="#ffffff"/>
+    <rect x="70" y="60" width="20" height="70" fill="#ffffff"/>
+    <rect x="120" y="60" width="20" height="70" fill="#ffffff"/>
+    <rect x="10" y="130" width="140" height="20" fill="#ffffff"/>
   </g>
 </svg>
