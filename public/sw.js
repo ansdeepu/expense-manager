@@ -34,14 +34,18 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).catch(() => {
+      return cachedResponse || fetch(event.request).catch(() => {
         // Fallback for navigation requests
         if (event.request.mode === 'navigate') {
-          return caches.match('/');
+          return caches.match('/').then(rootResponse => {
+            return rootResponse || new Response('Offline - application content not cached');
+          });
         }
+        // Return a generic error response for other failed fetches
+        return new Response('Network error occurred', {
+          status: 408,
+          statusText: 'Network Error'
+        });
       });
     })
   );

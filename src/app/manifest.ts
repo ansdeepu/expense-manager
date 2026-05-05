@@ -14,6 +14,13 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: 'portrait',
     prefer_related_applications: false,
     categories: ['finance', 'productivity'],
+    shortcuts: [
+      {
+        name: 'Dashboard',
+        url: '/dashboard',
+        icons: [{ src: '/app-icon.png', sizes: '192x192' }]
+      }
+    ],
     icons: [
       {
         src: '/app-icon.png',
