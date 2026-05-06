@@ -1,6 +1,6 @@
 {
-  "name": "FinBudgetManager",
-  "short_name": "Budget",
+  "name": "FinManager",
+  "short_name": "FinManager",
   "description": "Smart personal finance and budget tracking application.",
   "id": "/",
   "start_url": "/",
