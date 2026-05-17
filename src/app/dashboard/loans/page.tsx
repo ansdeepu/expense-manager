@@ -78,21 +78,39 @@ export default function LoansPage() {
     const accountMap = new Map(rawAccounts.map(acc => [acc.id, acc]));
 
     allTransactions.forEach(t => {
-        if (t.type === 'income' && t.accountId && balances[t.accountId] !== undefined) {
+        // Handle direct Income/Expense
+        if (t.accountId && balances[t.accountId] !== undefined) {
             const account = accountMap.get(t.accountId);
-            if(account?.type === 'card') {
-                balances[t.accountId] -= t.amount; // Income to card decreases debt
-            } else {
-                balances[t.accountId] += t.amount;
+            if (t.type === 'income') {
+                if (account?.type === 'card') {
+                    balances[t.accountId] -= t.amount;
+                } else {
+                    balances[t.accountId] += t.amount;
+                }
+            } else if (t.type === 'expense') {
+                if (account?.type === 'card') {
+                    balances[t.accountId] += t.amount;
+                } else {
+                    balances[t.accountId] -= t.amount;
+                }
+            } else if ((t as any).type === 'loan') {
+                // If recorded as 'loan' in transactions collection
+                if (account?.type === 'card') {
+                    balances[t.accountId] += t.amount;
+                } else {
+                    balances[t.accountId] += t.amount;
+                }
+            } else if ((t as any).type === 'repayment') {
+                if (account?.type === 'card') {
+                    balances[t.accountId] -= t.amount;
+                } else {
+                    balances[t.accountId] -= t.amount;
+                }
             }
-        } else if (t.type === 'expense' && t.accountId && t.paymentMethod === 'online' && balances[t.accountId] !== undefined) {
-            const account = accountMap.get(t.accountId);
-            if (account?.type === 'card') {
-                balances[t.accountId] += t.amount;
-            } else {
-                balances[t.accountId] -= t.amount;
-            }
-        } else if (t.type === 'transfer') {
+        }
+        
+        // Handle Transfer (specifically for from/to)
+        if (t.type === 'transfer') {
             if (t.fromAccountId && balances[t.fromAccountId] !== undefined) {
                 const fromAccount = accountMap.get(t.fromAccountId);
                 if (fromAccount?.type === 'card') {

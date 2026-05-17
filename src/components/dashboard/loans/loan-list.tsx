@@ -350,8 +350,10 @@ function CardAccordionItem({
     const { transactionsForPeriod, periodTotals } = useMemo(() => {
         const allCardTransactions = (transactions || [])
             .filter(t =>
-                (t.type === 'expense' && t.accountId === card.id) ||
-                (t.type === 'transfer' && (t.toAccountId === card.id || t.fromAccountId === card.id))
+                (t.accountId === card.id) ||
+                (t.type === 'transfer' && (t.toAccountId === card.id || t.fromAccountId === card.id)) ||
+                ((t as any).type === 'loan' && t.accountId === card.id) ||
+                ((t as any).type === 'repayment' && t.accountId === card.id)
             )
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -361,16 +363,30 @@ function CardAccordionItem({
             let payment = 0;
             let effect = 0;
 
-            if (t.type === 'expense' && t.accountId === card.id) {
-                charge = t.amount;
-                effect = t.amount;
-            } else if (t.type === 'transfer') {
-                if (t.toAccountId === card.id) {
-                    payment = t.amount;
-                    effect = -t.amount;
-                } else if (t.fromAccountId === card.id) {
+            if (t.accountId === card.id) {
+                if (t.type === 'expense') {
                     charge = t.amount;
                     effect = t.amount;
+                } else if (t.type === 'income') {
+                    payment = t.amount;
+                    effect = -t.amount;
+                } else if ((t as any).type === 'loan') {
+                    charge = t.amount;
+                    effect = t.amount;
+                } else if ((t as any).type === 'repayment') {
+                    payment = t.amount;
+                    effect = -t.amount;
+                }
+            }
+            
+            if (t.type === 'transfer') {
+                if (t.toAccountId === card.id) {
+                    payment += t.amount;
+                    effect -= t.amount;
+                }
+                if (t.fromAccountId === card.id) {
+                    charge += t.amount;
+                    effect += t.amount;
                 }
             }
             runningBalance += effect;
