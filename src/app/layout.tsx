@@ -16,7 +16,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "FinManager",
+  title: "Fin Manager",
   description: "Manage your expenses with ease and get AI-powered insights.",
   manifest: "/manifest.json",
   icons: {
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "FinManager",
+    title: "Fin Manager",
   },
   formatDetection: {
     telephone: false,

@@ -8,9 +8,7 @@ export default function LoginPage() {
         <div className="mb-8 flex flex-col items-center text-center">
           <div className="mb-4 flex items-center justify-center gap-2 text-primary">
             <Landmark className="h-10 w-10" />
-            <h1 className="text-4xl font-bold text-foreground">
-              Expense Manager
-            </h1>
+            <h1 className="text-4xl font-bold text-foreground">Fin Manager</h1>
           </div>
           <p className="text-muted-foreground">
             Welcome back! Please sign in to continue.

@@ -1,4 +1,4 @@
-# **App Name**: Expense Manager
+# **App Name**: Fin Manager
 
 ## Core Features:
 

@@ -88,7 +88,7 @@ export function Header() {
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 font-semibold">
             <Wallet className="h-6 w-6 text-primary" />
-            <span className="hidden sm:inline">Expense Manager</span>
+            <span className="hidden sm:inline">Fin Manager</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -103,7 +103,7 @@ export function Header() {
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-2 font-semibold flex-shrink-0">
           <Wallet className="h-6 w-6 text-primary" />
-          <span className="hidden sm:inline">Expense Manager</span>
+          <span className="hidden sm:inline">Fin Manager</span>
         </div>
         <nav className="flex flex-row items-center gap-1 flex-wrap py-1">
           {menuItems.map(item => (
