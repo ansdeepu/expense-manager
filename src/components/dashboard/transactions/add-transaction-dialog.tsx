@@ -465,8 +465,17 @@ export function AddTransactionDialog({
                   <div className="max-h-[20rem] overflow-y-auto pr-2 space-y-3 -mr-2">
                     {expenseItems.map((item, index) => (
                         <React.Fragment key={item.id}>
-                            <div className="relative p-2 border-b">
-                                <div className="grid grid-cols-12 gap-x-3 gap-y-2 items-end">
+                            <div className="relative p-2 border-b flex items-start sm:items-end gap-2">
+                                <div className="flex items-center h-9 mt-1 sm:mt-0">
+                                    {index === expenseItems.length - 1 ? (
+                                        <Button type="button" variant="ghost" size="icon" onClick={addExpenseItem} className="h-9 w-9 text-muted-foreground hover:text-foreground">
+                                            <Plus className="h-4 w-4" />
+                                        </Button>
+                                    ) : (
+                                        <div className="w-9 h-9" />
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-12 gap-x-3 gap-y-2 items-end flex-1">
                                     <div className="col-span-12 sm:col-span-4 md:col-span-3 space-y-1">
                                         <Textarea rows={1} id={`description-expense-${index}`} value={item.description} onChange={(e) => handleExpenseItemChange(index, 'description', e.target.value)} placeholder="Description" required className="text-sm bg-white dark:bg-input"/>
                                     </div>
@@ -585,9 +594,11 @@ export function AddTransactionDialog({
                             <Input id="date-transfer" name="date-transfer" type="date" value={date} onChange={e => setDate(e.target.value)} required className="bg-white dark:bg-input"/>
                         </div>
                          <div className="space-y-2">
+                            <Label htmlFor="description-transfer">Description</Label>
                             <Textarea id="description-transfer" value={transferDescription} onChange={(e) => setTransferDescription(e.target.value)} placeholder="Description" className="bg-white dark:bg-input" />
                         </div>
                         <div className="space-y-2">
+                            <Label htmlFor="amount-transfer">Amount</Label>
                             <Input id="amount-transfer" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} onBlur={handleTransferAmountBlur} placeholder="Amount" required className="hide-number-arrows bg-white dark:bg-input"/>
                         </div>
                    </div>
