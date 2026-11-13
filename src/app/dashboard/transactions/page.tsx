@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef, use } from "r
 import { TransactionTable } from "@/components/dashboard/transactions/transaction-table";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, orderBy, doc, setDoc, updateDoc } from "firebase/firestore";
-import type { Account, Transaction, Loan } from "@/lib/data";
+import type { Account, Transaction, Loan, Category } from "@/lib/data";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
@@ -98,6 +98,7 @@ export default function TransactionsPage(props: {
   const [user, userLoading] = useAuthState();
   const [rawAccounts, setRawAccounts] = useState<Omit<Account, 'balance'>[]>([]);
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [walletPreferences, setWalletPreferences] = useState<{ cash?: { balance?: number, date?: string }, digital?: { balance?: number, date?: string } }>({});
   const [dataLoading, setDataLoading] = useState(true);
@@ -163,6 +164,11 @@ export default function TransactionsPage(props: {
       const unsubscribeTransactions = onSnapshot(transactionsQuery, (snapshot) => {
         setAllTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
       });
+
+      const categoriesQuery = query(collection(db, "categories"), where("userId", "==", user.uid));
+      const unsubscribeCategories = onSnapshot(categoriesQuery, (snapshot) => {
+        setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category)));
+      });
       
       const preferencesDocRef = doc(db, "user_preferences", user.uid);
       const unsubscribePreferences = onSnapshot(preferencesDocRef, (doc) => {
@@ -201,6 +207,7 @@ export default function TransactionsPage(props: {
       return () => {
         unsubscribeAccounts();
         unsubscribeTransactions();
+        unsubscribeCategories();
         unsubscribePreferences();
         unsubscribeLoans();
       };
@@ -385,8 +392,8 @@ export default function TransactionsPage(props: {
     return 99;
   }, [getLoanDisplayInfo, loans]);
 
- const { filteredTransactions, transactionBalanceMap, transactionBreakdownMap } = useMemo(() => {
-    if (!activeTab) return { filteredTransactions: [], transactionBalanceMap: new Map(), transactionBreakdownMap: new Map() };
+ const { filteredTransactions, transactionBalanceMap, transactionBreakdownMap, searchMatchedTotal } = useMemo(() => {
+    if (!activeTab) return { filteredTransactions: [], transactionBalanceMap: new Map(), transactionBreakdownMap: new Map(), searchMatchedTotal: 0 };
 
     const isPrimaryView = activeTab === primaryAccount?.id;
     const creditCardIds = accounts.filter(acc => acc.type === 'card').map(acc => acc.id);
@@ -513,30 +520,64 @@ export default function TransactionsPage(props: {
         });
     }
 
-    if (searchQuery) {
-      const lowercasedQuery = searchQuery.toLowerCase();
+    const categoryNameById = new Map(categories.map(c => [c.id, c.name]));
+    const trimmedQuery = searchQuery.trim().toLowerCase();
+    let matchedItemsTotal = 0;
+
+    if (trimmedQuery) {
       displayTransactions = displayTransactions.filter(t => {
         const loanInfo = getLoanDisplayInfo(t);
         const accountName = t.type === 'transfer' ? `${getAccountName(t.fromAccountId)} -> ${getAccountName(t.toAccountId)}` : getAccountName(t.accountId, t.paymentMethod);
         const amountString = formatCurrency(t.amount);
         const description = loanInfo.description || t.description;
-        const category = loanInfo.category || t.category;
+        const category = loanInfo.category || (t.categoryId ? categoryNameById.get(t.categoryId) : undefined) || t.category;
 
-        return (
-            (t.date && format(new Date(t.date), 'dd/MM/yy').toLowerCase().includes(lowercasedQuery)) ||
-            (description && description.toLowerCase().includes(lowercasedQuery)) ||
-            (loanInfo.type && loanInfo.type.toLowerCase().includes(lowercasedQuery)) ||
-            (accountName && accountName.toLowerCase().includes(lowercasedQuery)) ||
-            (category && category.toLowerCase().includes(lowercasedQuery)) ||
-            (t.subcategory && t.subcategory.toLowerCase().includes(lowercasedQuery)) ||
-            (amountString && amountString.toLowerCase().includes(lowercasedQuery)) ||
-            (t.amount && t.amount.toString().includes(lowercasedQuery))
-        );
+        const topLevelMatch =
+            (t.date && format(new Date(t.date), 'dd/MM/yy').toLowerCase().includes(trimmedQuery)) ||
+            (description && description.toLowerCase().includes(trimmedQuery)) ||
+            (loanInfo.type && loanInfo.type.toLowerCase().includes(trimmedQuery)) ||
+            (accountName && accountName.toLowerCase().includes(trimmedQuery)) ||
+            (category && category.toLowerCase().includes(trimmedQuery)) ||
+            (t.subcategory && t.subcategory.toLowerCase().includes(trimmedQuery)) ||
+            (amountString && amountString.toLowerCase().includes(trimmedQuery)) ||
+            (t.amount !== undefined && t.amount.toString().includes(trimmedQuery));
+
+        if (t.items && t.items.length > 0) {
+          const matchingItems = t.items.filter(item => {
+            const itemCat = (item.categoryId ? categoryNameById.get(item.categoryId) : undefined) || item.category || "";
+            const itemAmt = Number(item.amount) || 0;
+            const itemAmtStr = formatCurrency(itemAmt).toLowerCase();
+            return (
+              (item.description && item.description.toLowerCase().includes(trimmedQuery)) ||
+              (itemCat && itemCat.toLowerCase().includes(trimmedQuery)) ||
+              (item.category && item.category.toLowerCase().includes(trimmedQuery)) ||
+              (item.subcategory && item.subcategory.toLowerCase().includes(trimmedQuery)) ||
+              itemAmtStr.includes(trimmedQuery) ||
+              itemAmt.toString().includes(trimmedQuery)
+            );
+          });
+
+          if (matchingItems.length > 0) {
+            matchedItemsTotal += matchingItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+            return true;
+          }
+          if (topLevelMatch) {
+            matchedItemsTotal += Number(t.amount) || 0;
+            return true;
+          }
+          return false;
+        }
+
+        if (topLevelMatch) {
+          matchedItemsTotal += Number(t.amount) || 0;
+          return true;
+        }
+        return false;
       });
     }
 
-    return { filteredTransactions: displayTransactions, transactionBalanceMap: balances, transactionBreakdownMap: breakdowns };
-  }, [allTransactions, accounts, activeTab, startDate, endDate, searchQuery, getLoanDisplayInfo, getAccountName, primaryAccount, loans, cashWalletBalance, digitalWalletBalance, getTransactionSortOrder]);
+    return { filteredTransactions: displayTransactions, transactionBalanceMap: balances, transactionBreakdownMap: breakdowns, searchMatchedTotal: matchedItemsTotal };
+  }, [allTransactions, accounts, categories, activeTab, startDate, endDate, searchQuery, getLoanDisplayInfo, getAccountName, primaryAccount, loans, cashWalletBalance, digitalWalletBalance, getTransactionSortOrder]);
 
   const transactionsWithRunningBalance = useMemo(() => {
     return filteredTransactions.map(transaction => ({
@@ -795,6 +836,17 @@ export default function TransactionsPage(props: {
         </div>
       </div>
       
+      {searchQuery.trim() && (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-xs bg-muted/40 border rounded-md print-hide">
+          <span className="text-muted-foreground">
+            Showing <span className="font-semibold text-foreground">{filteredTransactions.length}</span> matching {filteredTransactions.length === 1 ? 'entry' : 'entries'} for <span className="font-semibold text-foreground">&ldquo;{searchQuery.trim()}&rdquo;</span>
+          </span>
+          <span className="font-medium">
+            Matched Total: <span className="font-mono font-bold text-primary">{formatCurrency(searchMatchedTotal)}</span>
+          </span>
+        </div>
+      )}
+
       <Card className="flex-1 min-h-0">
         <div className="relative overflow-auto max-h-[calc(100vh-24rem)]">
           <TransactionTable 
@@ -803,6 +855,7 @@ export default function TransactionsPage(props: {
               primaryAccount={primaryAccount}
               currentPage={currentPage}
               itemsPerPage={itemsPerPage}
+              searchQuery={searchQuery}
               onEditTransaction={handleEditClick}
               onBalanceClick={(transaction) => {
                   if (activeTab === primaryAccount?.id && transaction.breakdown) {

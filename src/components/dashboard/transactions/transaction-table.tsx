@@ -48,6 +48,7 @@ export function TransactionTable({
   primaryAccount,
   currentPage,
   itemsPerPage,
+  searchQuery = "",
   onEditTransaction,
   onBalanceClick
 }: {
@@ -56,6 +57,7 @@ export function TransactionTable({
   primaryAccount: Account | undefined;
   currentPage: number;
   itemsPerPage: number;
+  searchQuery?: string;
   onEditTransaction: (transaction: Transaction) => void;
   onBalanceClick?: (transaction: any) => void;
 }) {
@@ -64,6 +66,23 @@ export function TransactionTable({
   const [loans, setLoans] = useState<Loan[]>([]);
   const [user] = useAuthState();
   const { toast } = useToast();
+
+  const trimmedQuery = searchQuery.trim().toLowerCase();
+
+  const isSubItemMatch = (item: NonNullable<Transaction['items']>[number]) => {
+    if (!trimmedQuery) return false;
+    const catName = categories.find(c => c.id === item.categoryId || c.name === item.category)?.name || item.category || "";
+    const amt = Number(item.amount) || 0;
+    const amtStr = formatCurrency(amt).toLowerCase();
+    return (
+      (item.description && item.description.toLowerCase().includes(trimmedQuery)) ||
+      catName.toLowerCase().includes(trimmedQuery) ||
+      (item.category && item.category.toLowerCase().includes(trimmedQuery)) ||
+      (item.subcategory && item.subcategory.toLowerCase().includes(trimmedQuery)) ||
+      amtStr.includes(trimmedQuery) ||
+      amt.toString().includes(trimmedQuery)
+    );
+  };
 
   const getAccountName = (accId?: string, paymentMethod?: Transaction['paymentMethod']) => {
     if (accId === 'cash-wallet' || paymentMethod === 'cash') return "Cash Wallet";
@@ -208,7 +227,13 @@ export function TransactionTable({
                                   <div className="h-5" />
                                   <div className="flex flex-col gap-0.5">
                                       {t.items!.map((item, i) => (
-                                          <div key={i} className="text-sm leading-tight border-b border-muted/30 last:border-0 pb-1 mb-1 last:pb-0 last:mb-0">
+                                          <div
+                                            key={i}
+                                            className={cn(
+                                              "text-sm leading-tight border-b border-muted/30 last:border-0 pb-1 mb-1 last:pb-0 last:mb-0",
+                                              isSubItemMatch(item) && "bg-primary/10 text-foreground font-medium rounded px-1 -mx-1"
+                                            )}
+                                          >
                                               {item.description}
                                           </div>
                                       ))}
@@ -231,7 +256,14 @@ export function TransactionTable({
                                           const catName = categories.find(c => c.id === item.categoryId || c.name === item.category)?.name || item.category;
                                           return `${catName}${item.subcategory ? ` / ${item.subcategory}` : ''}`;
                                       }))).map((combined, i) => (
-                                          <div key={i}>{combined}</div>
+                                          <div
+                                            key={i}
+                                            className={cn(
+                                              trimmedQuery && combined.toLowerCase().includes(trimmedQuery) && "bg-primary/10 text-foreground font-semibold rounded px-1 -mx-1"
+                                            )}
+                                          >
+                                            {combined}
+                                          </div>
                                       ))}
                                   </div>
                               </div>
@@ -248,7 +280,13 @@ export function TransactionTable({
                                   <span className="font-bold h-5 flex items-center justify-end">{formatCurrency(t.debit)}</span>
                                   <div className="flex flex-col gap-0.5 text-muted-foreground opacity-70">
                                       {t.items!.map((item, i) => (
-                                          <div key={i} className="leading-tight border-b border-muted/30 last:border-0 pb-1 mb-1 last:pb-0 last:mb-0">
+                                          <div
+                                            key={i}
+                                            className={cn(
+                                              "leading-tight border-b border-muted/30 last:border-0 pb-1 mb-1 last:pb-0 last:mb-0",
+                                              isSubItemMatch(item) && "bg-primary/10 text-red-600 font-semibold opacity-100 rounded px-1 -mx-1"
+                                            )}
+                                          >
                                               {formatCurrency(item.amount)}
                                           </div>
                                       ))}
@@ -264,7 +302,13 @@ export function TransactionTable({
                                   <span className="font-bold h-5 flex items-center justify-end">{formatCurrency(t.transfer)}</span>
                                   <div className="flex flex-col gap-0.5 text-muted-foreground opacity-70">
                                       {t.items!.map((item, i) => (
-                                          <div key={i} className="leading-tight border-b border-muted/30 last:border-0 pb-1 mb-1 last:pb-0 last:mb-0">
+                                          <div
+                                            key={i}
+                                            className={cn(
+                                              "leading-tight border-b border-muted/30 last:border-0 pb-1 mb-1 last:pb-0 last:mb-0",
+                                              isSubItemMatch(item) && "bg-primary/10 text-blue-600 font-semibold opacity-100 rounded px-1 -mx-1"
+                                            )}
+                                          >
                                               {formatCurrency(item.amount)}
                                           </div>
                                       ))}
@@ -280,7 +324,13 @@ export function TransactionTable({
                                   <span className="font-bold h-5 flex items-center justify-end">{formatCurrency(t.credit)}</span>
                                   <div className="flex flex-col gap-0.5 text-muted-foreground opacity-70">
                                       {t.items!.map((item, i) => (
-                                          <div key={i} className="leading-tight border-b border-muted/30 last:border-0 pb-1 mb-1 last:pb-0 last:mb-0">
+                                          <div
+                                            key={i}
+                                            className={cn(
+                                              "leading-tight border-b border-muted/30 last:border-0 pb-1 mb-1 last:pb-0 last:mb-0",
+                                              isSubItemMatch(item) && "bg-primary/10 text-green-600 font-semibold opacity-100 rounded px-1 -mx-1"
+                                            )}
+                                          >
                                               {formatCurrency(item.amount)}
                                           </div>
                                       ))}
