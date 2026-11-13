@@ -84,32 +84,32 @@ export function LoanSummary() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-            <HandCoins />
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 text-xl">
+            <HandCoins className="h-5 w-5 text-primary" />
             Loan Summary
         </CardTitle>
         <CardDescription>
           An overview of your outstanding loans.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-6 md:grid-cols-2">
-        <div className="flex items-center gap-4">
-            <div className="bg-red-100 dark:bg-red-900/50 p-3 rounded-full">
+      <CardContent className="grid gap-4 md:grid-cols-2">
+        <div className="flex items-center gap-4 rounded-xl border border-border/80 bg-muted/25 p-4">
+            <div className="bg-red-100 dark:bg-red-900/50 p-3 rounded-xl">
                 <TrendingDown className="h-6 w-6 text-red-600" />
             </div>
             <div>
-                <p className="text-sm text-muted-foreground">Total Loan Taken</p>
-                <p className="text-2xl font-bold">{formatCurrency(totalLoanTaken)}</p>
+                <p className="text-sm font-medium text-muted-foreground">Total Loan Taken</p>
+                <p className="text-2xl font-bold tracking-tight tabular-nums">{formatCurrency(totalLoanTaken)}</p>
             </div>
         </div>
-        <div className="flex items-center gap-4">
-            <div className="bg-green-100 dark:bg-green-900/50 p-3 rounded-full">
+        <div className="flex items-center gap-4 rounded-xl border border-border/80 bg-muted/25 p-4">
+            <div className="bg-green-100 dark:bg-green-900/50 p-3 rounded-xl">
                 <TrendingUp className="h-6 w-6 text-green-600" />
             </div>
             <div>
-                <p className="text-sm text-muted-foreground">Total Loan Given</p>
-                <p className="text-2xl font-bold">{formatCurrency(totalLoanGiven)}</p>
+                <p className="text-sm font-medium text-muted-foreground">Total Loan Given</p>
+                <p className="text-2xl font-bold tracking-tight tabular-nums">{formatCurrency(totalLoanGiven)}</p>
             </div>
         </div>
       </CardContent>

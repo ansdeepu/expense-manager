@@ -207,7 +207,14 @@ export function ReportView({
                 allAccountIncomeDetails[t.category || 'Other'] = (allAccountIncomeDetails[t.category || 'Other'] || 0) + t.amount;
             }
             if (t.type === 'expense') {
-                allAccountExpenseDetails[t.category || 'Other'] = (allAccountExpenseDetails[t.category || 'Other'] || 0) + t.amount;
+                if (t.items && t.items.length > 0) {
+                    t.items.forEach(item => {
+                        const catName = item.category || categories.find(c => c && c.id === item.categoryId)?.name || 'Other';
+                        allAccountExpenseDetails[catName] = (allAccountExpenseDetails[catName] || 0) + (Number(item.amount) || 0);
+                    });
+                } else {
+                    allAccountExpenseDetails[t.category || 'Other'] = (allAccountExpenseDetails[t.category || 'Other'] || 0) + t.amount;
+                }
             }
         }
         
@@ -412,29 +419,44 @@ export function ReportView({
         if (!t) return;
         let include = (isPrimaryReport && (t.accountId === accountId || t.paymentMethod === 'cash' || t.paymentMethod === 'digital' || (t.accountId && creditCardIds.has(t.accountId))));
         if (!include) return;
-        const cat = t.category || "Uncategorized";
-        const sub = t.subcategory || "Unspecified";
         if (t.type === 'income') {
+            const cat = t.category || "Uncategorized";
+            const sub = t.subcategory || "Unspecified";
             data.totalIncome += t.amount;
             if (!data.incomeByCategory[cat]) data.incomeByCategory[cat] = { total: 0, budget: 0, subcategories: {} };
             data.incomeByCategory[cat].total += t.amount;
             data.incomeByCategory[cat].subcategories[sub] = (data.incomeByCategory[cat].subcategories[sub] || 0) + t.amount;
-        } else if (t.type === 'expense' && !bankExpenseNames.has(cat)) {
-            data.totalExpense += t.amount;
-            if (!data.expenseByCategory[cat]) data.expenseByCategory[cat] = { total: 0, budget: 0, subcategories: {} };
-            data.expenseByCategory[cat].total += t.amount;
-            data.expenseByCategory[cat].subcategories[sub] = (data.expenseByCategory[cat].subcategories[sub] || 0) + t.amount;
-            if (t.frequency === 'occasional') {
-                data.totalOccasionalExpense += t.amount;
-                if (!data.occasionalExpenseByCategory[cat]) data.occasionalExpenseByCategory[cat] = { total: 0, budget: 0, subcategories: {} };
-                data.occasionalExpenseByCategory[cat].total += t.amount;
-                data.occasionalExpenseByCategory[cat].subcategories[sub] = (data.occasionalExpenseByCategory[cat].subcategories[sub] || 0) + t.amount;
-            } else {
-                data.totalRegularExpense += t.amount;
-                if (!data.regularExpenseByCategory[cat]) data.regularExpenseByCategory[cat] = { total: 0, budget: 0, subcategories: {} };
-                data.regularExpenseByCategory[cat].total += t.amount;
-                data.regularExpenseByCategory[cat].subcategories[sub] = (data.regularExpenseByCategory[cat].subcategories[sub] || 0) + t.amount;
-            }
+        } else if (t.type === 'expense') {
+            const entries = (t.items && t.items.length > 0)
+                ? t.items.map(item => ({
+                    cat: item.category || (item.categoryId ? categories.find(c => c && c.id === item.categoryId)?.name : undefined) || "Uncategorized",
+                    sub: item.subcategory || "Unspecified",
+                    amount: Number(item.amount) || 0,
+                  }))
+                : [{
+                    cat: t.category || (t.categoryId ? categories.find(c => c && c.id === t.categoryId)?.name : undefined) || "Uncategorized",
+                    sub: t.subcategory || "Unspecified",
+                    amount: Number(t.amount) || 0,
+                  }];
+
+            entries.forEach(({ cat, sub, amount }) => {
+                if (bankExpenseNames.has(cat)) return;
+                data.totalExpense += amount;
+                if (!data.expenseByCategory[cat]) data.expenseByCategory[cat] = { total: 0, budget: 0, subcategories: {} };
+                data.expenseByCategory[cat].total += amount;
+                data.expenseByCategory[cat].subcategories[sub] = (data.expenseByCategory[cat].subcategories[sub] || 0) + amount;
+                if (t.frequency === 'occasional') {
+                    data.totalOccasionalExpense += amount;
+                    if (!data.occasionalExpenseByCategory[cat]) data.occasionalExpenseByCategory[cat] = { total: 0, budget: 0, subcategories: {} };
+                    data.occasionalExpenseByCategory[cat].total += amount;
+                    data.occasionalExpenseByCategory[cat].subcategories[sub] = (data.occasionalExpenseByCategory[cat].subcategories[sub] || 0) + amount;
+                } else {
+                    data.totalRegularExpense += amount;
+                    if (!data.regularExpenseByCategory[cat]) data.regularExpenseByCategory[cat] = { total: 0, budget: 0, subcategories: {} };
+                    data.regularExpenseByCategory[cat].total += amount;
+                    data.regularExpenseByCategory[cat].subcategories[sub] = (data.regularExpenseByCategory[cat].subcategories[sub] || 0) + amount;
+                }
+            });
         }
     });
 
@@ -927,7 +949,7 @@ export function ReportView({
                             <TableBody>
                                 {Object.entries(monthlyReport.incomeByCategory).map(([catName, data]) => (
                                     <React.Fragment key={catName}>
-                                        <TableRow className="bg-muted/50"><TableCell colSpan={2} className="font-bold text-primary">{catName}</TableCell></TableRow>
+                                        <TableRow className="bg-muted/50"><TableCell className="font-bold text-primary">{catName}</TableCell><TableCell className="text-right font-mono font-bold text-green-600">{formatCurrency(data.total)}</TableCell></TableRow>
                                         {Object.entries(data.subcategories).sort(([,a],[,b]) => b - a).map(([sub, amt]) => (
                                             <TableRow key={sub} className="border-0"><TableCell className="pl-6">{sub}</TableCell><TableCell className="text-right font-mono text-green-600">{formatCurrency(amt)}</TableCell></TableRow>
                                         ))}
@@ -1085,7 +1107,7 @@ export function ReportView({
                             <TableBody>
                                 {Object.entries(monthlyReport.regularExpenseByCategory).sort(([,a],[,b]) => b.total - a.total).map(([catName, data]) => (
                                     <React.Fragment key={catName}>
-                                        <TableRow className="bg-muted/50"><TableCell colSpan={2} className="font-bold text-red-600">{catName}</TableCell></TableRow>
+                                        <TableRow className="bg-muted/50"><TableCell className="font-bold text-red-600">{catName}</TableCell><TableCell className="text-right font-mono font-bold text-red-600">{formatCurrency(data.total)}</TableCell></TableRow>
                                         {Object.entries(data.subcategories).sort(([,a],[,b]) => b - a).map(([sub, amt]) => (
                                             <TableRow key={sub} className="border-0"><TableCell className="pl-6">{sub}</TableCell><TableCell className="text-right font-mono">{formatCurrency(amt)}</TableCell></TableRow>
                                         ))}
@@ -1110,7 +1132,7 @@ export function ReportView({
                             <TableBody>
                                 {Object.entries(monthlyReport.occasionalExpenseByCategory).sort(([,a],[,b]) => b.total - a.total).map(([catName, data]) => (
                                     <React.Fragment key={catName}>
-                                        <TableRow className="bg-muted/50"><TableCell colSpan={2} className="font-bold text-red-600">{catName}</TableCell></TableRow>
+                                        <TableRow className="bg-muted/50"><TableCell className="font-bold text-red-600">{catName}</TableCell><TableCell className="text-right font-mono font-bold text-red-600">{formatCurrency(data.total)}</TableCell></TableRow>
                                         {Object.entries(data.subcategories).sort(([,a],[,b]) => b - a).map(([sub, amt]) => (
                                             <TableRow key={sub} className="border-0"><TableCell className="pl-6">{sub}</TableCell><TableCell className="text-right font-mono">{formatCurrency(amt)}</TableCell></TableRow>
                                         ))}

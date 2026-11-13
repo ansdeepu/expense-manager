@@ -164,19 +164,35 @@ export function CategoryExpenses() {
     });
 
     primaryEcosystemOutflows.forEach(t => {
-      let category = categories.find(c => c.id === t.categoryId || c.name === t.category);
-      
-      // Fallback for loans or unmapped categories
-      const categoryName = category?.name || t.category || "Uncategorized";
-      const catId = category?.id || categoryName;
+      const entries = (t.type === 'expense' && t.items && t.items.length > 0)
+        ? t.items.map(item => ({
+            categoryId: item.categoryId,
+            category: item.category,
+            subcategory: item.subcategory,
+            amount: Number(item.amount) || 0,
+          }))
+        : [{
+            categoryId: t.categoryId,
+            category: t.category,
+            subcategory: t.subcategory,
+            amount: Number(t.amount) || 0,
+          }];
 
-      if (!stats[catId]) {
-          stats[catId] = { id: catId, spent: 0, budget: 0, name: categoryName, icon: 'Tag', subcategories: {}, subcategoryCount: 0 };
-      }
+      entries.forEach(entry => {
+        const category = categories.find(c => (entry.categoryId && c.id === entry.categoryId) || c.name === entry.category);
+        
+        // Fallback for loans or unmapped categories
+        const categoryName = category?.name || entry.category || "Uncategorized";
+        const catId = category?.id || categoryName;
 
-      stats[catId].spent += t.amount;
-      const subCategoryName = t.subcategory || "Unspecified";
-      stats[catId].subcategories[subCategoryName] = (stats[catId].subcategories[subCategoryName] || 0) + t.amount;
+        if (!stats[catId]) {
+            stats[catId] = { id: catId, spent: 0, budget: 0, name: categoryName, icon: 'Tag', subcategories: {}, subcategoryCount: 0 };
+        }
+
+        stats[catId].spent += entry.amount;
+        const subCategoryName = entry.subcategory || "Unspecified";
+        stats[catId].subcategories[subCategoryName] = (stats[catId].subcategories[subCategoryName] || 0) + entry.amount;
+      });
     });
     
     return Object.values(stats).filter(s => s.spent > 0 || s.budget > 0);

@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, isFirebaseConfigured } from "@/lib/firebase";
 
 
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,14 @@ export function SignUpForm() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!isFirebaseConfigured) {
+      toast({
+        variant: "destructive",
+        title: "Firebase is not configured",
+        description: "Missing NEXT_PUBLIC_FIREBASE_* environment variables. Configure Firebase before signing up.",
+      });
+      return;
+    }
     setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(

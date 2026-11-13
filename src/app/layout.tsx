@@ -8,7 +8,7 @@ import { ClientProviders } from "@/components/client-providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const viewport: Viewport = {
-  themeColor: "#000000",
+  themeColor: "#0F766E",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -16,8 +16,12 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Fin Manager",
-  description: "Manage your expenses with ease and get AI-powered insights.",
+  title: "RupeeFlow",
+  description: "Comprehensive personal finance and budget management application.",
+  openGraph: {
+    title: "RupeeFlow",
+    description: "Comprehensive personal finance and budget management application.",
+  },
   manifest: "/manifest.json",
   icons: {
     icon: "/icon.svg",
@@ -27,7 +31,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Fin Manager",
+    title: "RupeeFlow",
   },
   formatDetection: {
     telephone: false,

@@ -101,7 +101,7 @@ export default function TransactionsPage(props: {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [walletPreferences, setWalletPreferences] = useState<{ cash?: { balance?: number, date?: string }, digital?: { balance?: number, date?: string } }>({});
   const [dataLoading, setDataLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<string | undefined>();
+  const [activeTab, setActiveTab] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
@@ -286,10 +286,14 @@ export default function TransactionsPage(props: {
   const primaryAccount = useMemo(() => accounts.find(a => a.isPrimary), [accounts]);
   
   useEffect(() => {
-    if (primaryAccount && !activeTab) {
-      setActiveTab(primaryAccount.id);
+    if (!activeTab) {
+      if (primaryAccount) {
+        setActiveTab(primaryAccount.id);
+      } else if (accounts.length > 0) {
+        setActiveTab(accounts[0].id);
+      }
     }
-  }, [primaryAccount, activeTab]);
+  }, [primaryAccount, accounts, activeTab]);
   
   const getAccountName = useCallback((accountId?: string, paymentMethod?: Transaction['paymentMethod']) => {
     if (accountId === 'cash-wallet' || paymentMethod === 'cash') return "Cash Wallet";
@@ -636,7 +640,7 @@ export default function TransactionsPage(props: {
           <TabsList className="grid grid-cols-8 gap-3 w-full h-auto p-1 bg-transparent">
             {primaryAccount && (
                 <TabsTrigger value={primaryAccount.id} asChild className="h-full p-0 col-span-4">
-                    <div className={cn("rounded-lg border-2 flex flex-col p-3 items-start text-left gap-2 cursor-pointer transition-shadow h-full w-full", activeTab === primaryAccount.id ? "shadow-lg border-primary bg-lime-100/50 dark:bg-lime-900/50" : "bg-card")}>
+                    <div className={cn("rounded-lg border-2 flex flex-col p-3 items-start text-left gap-2 cursor-pointer transition-shadow h-full w-full", activeTab === primaryAccount.id ? "shadow-lg border-primary bg-primary/5 dark:bg-primary/10" : "bg-card")}>
                         <div className="w-full flex justify-between items-center">
                               <h3 className="font-semibold text-base">Primary ({primaryAccount.name})</h3>
                               <span className="font-bold text-lg text-primary">{formatCurrency(primaryAllBalance)}</span>

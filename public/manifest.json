@@ -1,13 +1,13 @@
 {
-  "name": "Fin Manager",
-  "short_name": "Fin Manager",
+  "name": "RupeeFlow",
+  "short_name": "RupeeFlow",
   "description": "Smart personal finance and budget tracking application.",
   "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "background_color": "#F8FAFC",
+  "theme_color": "#0F766E",
   "orientation": "portrait",
   "icons": [
     {

@@ -183,28 +183,32 @@ export function AccountBalances() {
   return (
     <>
     <Card>
-        <CardHeader>
-            <CardTitle>Account Balances</CardTitle>
-            <CardDescription>Click any account to see a detailed transaction breakdown.</CardDescription>
+        <CardHeader className="pb-4">
+            <CardTitle className="text-xl">Account Balances</CardTitle>
+            <CardDescription>Click any account to inspect its full transaction passbook.</CardDescription>
         </CardHeader>
         <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                 <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleAccountClick('cash-wallet')}>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Cash Wallet</CardTitle>
-                        <Coins className="h-4 w-4 text-muted-foreground" />
+            <div className="grid gap-3.5 md:grid-cols-2 lg:grid-cols-3">
+                 <Card className="cursor-pointer border-border/80 bg-muted/25 hover:bg-primary/5 hover:border-primary/40 transition-all" onClick={() => handleAccountClick('cash-wallet')}>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Cash Wallet</CardTitle>
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <Coins className="h-4 w-4" />
+                        </span>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{formatCurrency(cashWalletBalance)}</div>
+                        <div className="text-xl font-bold tracking-tight tabular-nums">{formatCurrency(cashWalletBalance)}</div>
                     </CardContent>
                 </Card>
-                 <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleAccountClick('digital-wallet')}>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Digital Wallet</CardTitle>
-                        <Wallet className="h-4 w-4 text-muted-foreground" />
+                 <Card className="cursor-pointer border-border/80 bg-muted/25 hover:bg-primary/5 hover:border-primary/40 transition-all" onClick={() => handleAccountClick('digital-wallet')}>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Digital Wallet</CardTitle>
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <Wallet className="h-4 w-4" />
+                        </span>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{formatCurrency(digitalWalletBalance)}</div>
+                        <div className="text-xl font-bold tracking-tight tabular-nums">{formatCurrency(digitalWalletBalance)}</div>
                     </CardContent>
                 </Card>
                 {accounts.map(account => {
@@ -213,14 +217,16 @@ export function AccountBalances() {
                     const displayBalance = isCard ? availableLimit : account.balance;
                     
                     return (
-                     <Card key={account.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleAccountClick(account)}>
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium">{account.name}</CardTitle>
-                            <Landmark className="h-4 w-4 text-muted-foreground" />
+                     <Card key={account.id} className="cursor-pointer border-border/80 bg-muted/25 hover:bg-primary/5 hover:border-primary/40 transition-all" onClick={() => handleAccountClick(account)}>
+                        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                            <CardTitle className="text-sm font-medium text-muted-foreground truncate pr-2">{account.name}</CardTitle>
+                            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                              <Landmark className="h-4 w-4" />
+                            </span>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{formatCurrency(displayBalance)}</div>
-                            {isCard && <p className="text-[10px] text-muted-foreground mt-1">Available of {formatCurrency(account.limit || 0)}</p>}
+                            <div className="text-xl font-bold tracking-tight tabular-nums">{formatCurrency(displayBalance)}</div>
+                            {isCard && <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">Available of {formatCurrency(account.limit || 0)}</p>}
                         </CardContent>
                     </Card>
                 )})}

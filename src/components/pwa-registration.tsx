@@ -8,7 +8,7 @@ export function ServiceWorkerRegistration() {
       navigator.serviceWorker
         .register("/sw.js")
         .then((registration) => {
-          console.log("PWA: Service Worker registered:", registration.scope);
+          registration.update().catch(() => {});
         })
         .catch((error) => {
           console.error("PWA: Service Worker registration failed:", error);

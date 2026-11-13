@@ -6,7 +6,7 @@ import {
   Landmark,
   LayoutDashboard,
   ArrowRightLeft,
-  Wallet,
+  IndianRupee,
   Shapes,
   FileText,
   HelpCircle,
@@ -14,7 +14,7 @@ import {
   BookText,
   HandCoins,
   LogOut,
-  ArrowUpRight,
+  Menu,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -24,6 +24,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { auth } from "@/lib/firebase";
@@ -48,17 +55,18 @@ const generateColor = (str: string) => {
   for (let i = 0; i < str.length; i++) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash);
   }
-  let color = '#';
+  let color = "#";
   for (let i = 0; i < 3; i++) {
-    let value = (hash >> (i * 8)) & 0xFF;
-    color += ('00' + value.toString(16)).substr(-2);
+    const value = (hash >> (i * 8)) & 0xff;
+    color += ("00" + value.toString(16)).substr(-2);
   }
   return color;
-}
+};
 
 export function Header() {
   const [user, loading] = useAuthState();
   const [clientLoaded, setClientLoaded] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -67,99 +75,159 @@ export function Header() {
 
   const getInitials = (name: string | null | undefined) => {
     if (!name) return "U";
-    const names = name.split(' ');
+    const names = name.split(" ");
     if (names.length > 1) {
       return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
     }
     return name.substring(0, 2).toUpperCase();
-  }
-  
-  const avatarColor = user?.displayName ? generateColor(user.displayName) : '#cccccc';
+  };
 
-  const handleOpenNewWindow = (url: string) => {
-    if (typeof window !== "undefined") {
-      window.open(url, '_blank');
-    }
-  }
-  
+  const avatarColor = user?.displayName ? generateColor(user.displayName) : "#0F766E";
+
   if (!clientLoaded) {
     return (
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background px-4 md:px-6">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 font-semibold">
-            <Wallet className="h-6 w-6 text-primary" />
-            <span className="hidden sm:inline">Fin Manager</span>
+      <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-card/95 backdrop-blur px-4 md:px-6">
+        <div className="flex items-center gap-3 font-semibold">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <IndianRupee className="h-4 w-4" />
           </div>
+          <span className="text-base font-bold tracking-tight">RupeeFlow</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-8 w-8 rounded-full" />
-        </div>
+        <Skeleton className="h-8 w-8 rounded-full" />
       </header>
-    )
+    );
   }
 
   return (
-    <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between gap-4 border-b bg-background px-4 md:px-6 py-2 md:py-0">
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2 font-semibold flex-shrink-0">
-          <Wallet className="h-6 w-6 text-primary" />
-          <span className="hidden sm:inline">Fin Manager</span>
-        </div>
-        <nav className="flex flex-row items-center gap-1 flex-wrap py-1">
-          {menuItems.map(item => (
-            <div key={item.href} className="flex items-center gap-0.5 whitespace-nowrap px-1">
-              <Link
-                href={item.href}
-                className={cn(
-                  "text-xs px-2 py-1 rounded-md transition-colors hover:bg-muted hover:text-foreground",
-                  pathname === item.href ? "text-foreground font-semibold bg-muted" : "text-muted-foreground"
-                )}
+    <header className="sticky top-0 z-30 border-b border-border/80 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85">
+      <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 md:px-6 lg:px-8">
+        <div className="flex items-center gap-3 lg:gap-6 min-w-0">
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden -ml-2"
+                aria-label="Open navigation menu"
               >
-                {item.label}
-              </Link>
-              <Button variant="ghost" size="icon" onClick={() => handleOpenNewWindow(item.href)} aria-label={`Open ${item.label} in new window`} className="h-6 w-6 opacity-50 hover:opacity-100">
-                <ArrowUpRight className="h-3 w-3" />
+                <Menu className="h-5 w-5" />
               </Button>
-            </div>
-          ))}
-        </nav>
-      </div>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-72 p-4">
+              <SheetHeader className="border-b pb-4 mb-4 text-left">
+                <SheetTitle className="flex items-center gap-2.5">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                    <IndianRupee className="h-4 w-4" />
+                  </span>
+                  <span className="font-bold tracking-tight">RupeeFlow</span>
+                </SheetTitle>
+              </SheetHeader>
+              <nav className="flex flex-col gap-1">
+                {menuItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                        isActive
+                          ? "bg-primary/10 text-primary font-semibold"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+            </SheetContent>
+          </Sheet>
 
-      <div className="flex items-center gap-2 flex-shrink-0">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="flex items-center gap-2 rounded-full p-1 h-auto">
-              <Avatar className="h-8 w-8">
-                {loading ? (
-                  <Skeleton className="h-full w-full rounded-full" />
-                ) : (
-                  <>
-                    <AvatarImage src={user?.photoURL || ''} data-ai-hint="user avatar" />
-                    <AvatarFallback style={{ backgroundColor: avatarColor, color: '#fff' }}>
-                      {getInitials(user?.displayName)}
-                    </AvatarFallback>
-                  </>
-                )}
-              </Avatar>
-              <span className="font-medium text-sm hidden lg:block pr-2">{user?.displayName}</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel className="max-w-[200px] truncate">{user?.displayName || "My Account"}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <Link href="/dashboard/profile">
-              <DropdownMenuItem>
-                <User className="mr-2 h-4 w-4" />
-                <span>Profile</span>
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2.5 font-semibold flex-shrink-0"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+              <IndianRupee className="h-4 w-4" />
+            </span>
+            <span className="text-base font-bold tracking-tight text-foreground">
+              RupeeFlow
+            </span>
+          </Link>
+
+          <nav className="hidden lg:flex items-center gap-1">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
+                    isActive
+                      ? "bg-primary/10 text-primary font-semibold"
+                      : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="flex items-center gap-2 rounded-full p-1 h-auto hover:bg-muted/80"
+              >
+                <Avatar className="h-8 w-8 ring-1 ring-border">
+                  {loading ? (
+                    <Skeleton className="h-full w-full rounded-full" />
+                  ) : (
+                    <>
+                      <AvatarImage src={user?.photoURL || ""} data-ai-hint="user avatar" />
+                      <AvatarFallback style={{ backgroundColor: avatarColor, color: "#fff" }}>
+                        {getInitials(user?.displayName)}
+                      </AvatarFallback>
+                    </>
+                  )}
+                </Avatar>
+                <span className="font-medium text-sm hidden xl:block pr-2">
+                  {user?.displayName}
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel className="max-w-[200px] truncate">
+                {user?.displayName || "My Account"}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <Link href="/dashboard/profile">
+                <DropdownMenuItem className="cursor-pointer">
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Profile</span>
+                </DropdownMenuItem>
+              </Link>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => auth.signOut()}
+                className="cursor-pointer text-destructive focus:text-destructive"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Log out</span>
               </DropdownMenuItem>
-            </Link>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => auth.signOut()}>
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Log out</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </header>
   );

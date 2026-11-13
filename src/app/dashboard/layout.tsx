@@ -14,9 +14,9 @@ export default async function DashboardLayout(props: {
   return (
       <AuthGuard>
         <ReportDateProvider>
-            <div className="flex min-h-screen w-full flex-col overflow-x-hidden">
+            <div className="flex min-h-screen w-full flex-col overflow-x-hidden bg-background">
                 <Header />
-                <main className="flex-1 p-4 md:p-6">{props.children}</main>
+                <main className="mx-auto w-full max-w-7xl flex-1 p-4 md:p-6 lg:p-8">{props.children}</main>
             </div>
         </ReportDateProvider>
       </AuthGuard>
