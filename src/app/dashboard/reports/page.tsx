@@ -185,58 +185,90 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle>Monthly Reports</CardTitle>
-                    <CardDescription>An overview of your finances for the selected month.</CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={goToPreviousMonth}>
-                        <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-sm font-medium w-28 text-center">{format(currentDate, "MMMM yyyy")}</span>
-                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={goToNextMonth}>
-                        <ChevronRight className="h-4 w-4" />
-                    </Button>
-                </div>
-            </CardHeader>
-        </Card>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Monthly Reports</h1>
+          <p className="text-sm text-muted-foreground">
+            An overview of your finances for {format(currentDate, "MMMM yyyy")}.
+          </p>
+        </div>
+        <div className="inline-flex items-center gap-1 rounded-lg border bg-card p-1 self-start sm:self-auto">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={goToPreviousMonth}
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm font-semibold tabular-nums w-32 text-center whitespace-nowrap">
+            {format(currentDate, "MMMM yyyy")}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={goToNextMonth}
+            aria-label="Next month"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
       <Tabs defaultValue={primaryAccount?.id} className="w-full">
-        <TabsList className="flex w-full overflow-x-auto h-auto p-1">
+        <TabsList className="flex w-full overflow-x-auto h-auto p-1.5 bg-muted/70 rounded-lg gap-1.5 justify-start">
           {primaryAccount && (
-            <TabsTrigger value={primaryAccount.id} className="flex-shrink-0 flex flex-col h-auto p-2 items-start text-left min-w-64">
-              <span className="font-semibold text-sm">Primary ({primaryAccount.name})</span>
-              <div className="w-full text-xs text-muted-foreground mt-1">
-                  <div className="flex justify-between items-center">
-                    <span>Bank Balance: {formatCurrency(primaryAccount.balance)}</span>
-                    <span>Wallets: {formatCurrency(cashWalletBalance + digitalWalletBalance)}</span>
-                  </div>
-                  <div className="flex justify-between items-center mt-1 border-t pt-1">
-                    <span>Ecosystem Total:</span>
-                    <span className="font-bold text-primary">{formatCurrency(primaryAccount.balance + cashWalletBalance + digitalWalletBalance)}</span>
-                  </div>
+            <TabsTrigger
+              value={primaryAccount.id}
+              className="flex-shrink-0 flex flex-col h-auto px-3.5 py-2.5 items-start text-left min-w-64 rounded-md border border-transparent data-[state=active]:border-primary/40 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
+              <span className="font-semibold text-sm text-foreground whitespace-nowrap">
+                Primary ({primaryAccount.name})
+              </span>
+              <div className="w-full text-xs text-muted-foreground mt-1.5 space-y-1">
+                <div className="flex justify-between items-center gap-4 tabular-nums">
+                  <span>Bank: {formatCurrency(primaryAccount.balance)}</span>
+                  <span>Wallets: {formatCurrency(cashWalletBalance + digitalWalletBalance)}</span>
+                </div>
+                <div className="flex justify-between items-center pt-1 border-t border-border/60">
+                  <span>Ecosystem Total</span>
+                  <span className="font-mono tabular-nums font-bold text-primary">
+                    {formatCurrency(primaryAccount.balance + cashWalletBalance + digitalWalletBalance)}
+                  </span>
+                </div>
               </div>
             </TabsTrigger>
           )}
-          {filteredAccounts.filter(account => !account.isPrimary).map(account => (
-            <TabsTrigger key={account.id} value={account.id} className="flex-shrink-0 flex flex-col h-auto p-2">
-              <span>{account.name}</span>
-              <span className="font-bold text-primary">{formatCurrency(account.balance)}</span>
-            </TabsTrigger>
-          ))}
+          {filteredAccounts
+            .filter((account) => !account.isPrimary)
+            .map((account) => (
+              <TabsTrigger
+                key={account.id}
+                value={account.id}
+                className="flex-shrink-0 flex flex-col justify-center h-auto px-4 py-2.5 min-w-36 rounded-md border border-transparent data-[state=active]:border-primary/40 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                  {account.name}
+                </span>
+                <span className="font-mono tabular-nums font-bold text-sm text-primary mt-0.5 whitespace-nowrap">
+                  {formatCurrency(account.balance)}
+                </span>
+              </TabsTrigger>
+            ))}
         </TabsList>
-        
-        {accounts.map(account => (
+
+        {accounts.map((account) => (
           <TabsContent key={account.id} value={account.id} className="mt-6">
-            <ReportView 
-                transactions={transactions} 
-                categories={categories}
-                accounts={accounts}
-                loans={loans}
-                isOverallSummary={false} 
-                accountId={account.id}
-                isPrimaryReport={!!account.isPrimary}
+            <ReportView
+              transactions={transactions}
+              categories={categories}
+              accounts={accounts}
+              loans={loans}
+              isOverallSummary={false}
+              accountId={account.id}
+              isPrimaryReport={!!account.isPrimary}
             />
           </TabsContent>
         ))}
